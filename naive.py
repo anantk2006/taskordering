@@ -31,7 +31,7 @@ def run(train, test, benchmark, num_classes):
     cl_strategy = avl.training.Naive(
         model, SGD(model.parameters(), lr=learning_rate, momentum=0.), criterion,
         train_mb_size=train_mb_size, train_epochs=epochs, eval_mb_size=128,
-        device="cpu", evaluator=evaluation_plugin, plugins=[])
+        device="cuda", evaluator=evaluation_plugin, plugins=[])
     
     
     res = None
