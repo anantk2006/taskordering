@@ -54,8 +54,8 @@ def run(train, test, benchmark, num_classes):
 
     interactive_logger = InteractiveLogger()
     eval_plugin = EvaluationPlugin(
-        accuracy_metrics(experience=True, stream=True),
-        loss_metrics(experience=True, stream=True),
+        accuracy_metrics(epoch = True, experience=True, stream=True),
+        loss_metrics(epoch = True, experience=True, stream=True),
         benchmark=benchmark,
         loggers=[interactive_logger])
 
@@ -82,6 +82,7 @@ def run(train, test, benchmark, num_classes):
     for i, exp in enumerate(train):
         strategy.train(exp, num_workers=4)
         res = strategy.eval(test, num_workers=4)
+        
         yield res
 
     

@@ -54,9 +54,11 @@ for ind, perm in enumerate(permutations):
 
     for IND, res in enumerate(results):
         #print(f"AFTER EXPERIENCE {IND}")
+        
         for key, val in res.items():
             if key[:-3].endswith("Task") and "eval_phase" in key and "Acc" in key:
-                data_tensor[ind][0][IND][int(key[-1])] = val                
+                data_tensor[ind][0][IND][int(key[-1])] = val   
+                print(val)            
             if key[:-3].endswith("Task") and "eval_phase" in key and "Loss" in key:
                 data_tensor[ind][1][IND][int(key[-1])] = val
         for i in range(num_tasks): data_tensor[ind][0][-1][i] = data_tensor[ind][1][-1][i] = perm[i]      

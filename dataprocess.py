@@ -1,6 +1,7 @@
 import torch
-
+import matplotlib.pyplot as plt
 naive_data = torch.load("naive.pt")
+
 num_tasks = 5
 def calculate_forgetting(data):
     avg_forgettings = torch.zeros(len(data))
@@ -36,10 +37,22 @@ def calculate_accuracy(data):
         avgs[i] = torch.sum(perm_data[0][-2]).item()/num_tasks
     return avgs
 
-print(calculate_BWT(naive_data))
-print(calculate_FWT(naive_data))
-print(calculate_forgetting(naive_data))
-print(calculate_accuracy(naive_data))
+
+bwt = calculate_BWT(naive_data)
+fwt = calculate_FWT(naive_data)
+frgtng = calculate_forgetting(naive_data)
+acc = calculate_accuracy(naive_data)
+
+
+fig, axs = plt.subplots(1, 2, sharey=True, tight_layout=True)
+
+# We can set the number of bins with the *bins* keyword argument.
+axs[0].hist(fwt, bins=10)
+axs[1].hist(bwt, bins=10)
+plt.show()
+
+
+
 
 
 
