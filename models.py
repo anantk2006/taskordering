@@ -1,3 +1,4 @@
+import torch.nn as nn
 class SimpleCNN(nn.Module):
     def __init__(self, num_classes=10, num_channels = 1):
         super(SimpleCNN, self).__init__()
@@ -28,3 +29,7 @@ class SimpleCNN(nn.Module):
         x = x.view(x.size(0), -1)
         x = self.classifier(x)
         return x
+class MLP(nn.Module):
+    def __init__(self, num_classes = 10, num_channels = 3) -> None:
+        super(MLP, self).__init__()
+        seq = nn.Sequential([nn.Linear(784*num_channels, 784), nn.Linear(784, 256), nn.Linear(256, num_classes)])

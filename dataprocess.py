@@ -44,11 +44,13 @@ frgtng = calculate_forgetting(naive_data)
 acc = calculate_accuracy(naive_data)
 
 
-fig, axs = plt.subplots(1, 2, sharey=True, tight_layout=True)
-
+fig, axs = plt.subplots(1, 2, tight_layout=True)
+print(fwt.shape, bwt.shape)
 # We can set the number of bins with the *bins* keyword argument.
-axs[0].hist(fwt, bins=10)
-axs[1].hist(bwt, bins=10)
+#axs[0].hist([int(i*100) for i in list(fwt)], bins=[i*100 for i in [0.4, 0.45, 0.5,0.55,  0.6, 0.65]])
+#axs[1].hist([int(i*100) for i in list(bwt], bins=[i*100 for i in [-0.2, -0.15, -0.1, -0.05, 0, 0.05, 0.1, 0.15]])
+axs[0].hist(fwt.numpy(), bins = 30)
+axs[1].hist(bwt.numpy(), bins = 30)
 plt.show()
 
 

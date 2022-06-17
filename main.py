@@ -1,23 +1,29 @@
 from avalanche.benchmarks import SplitMNIST, PermutedMNIST, SplitCIFAR10
 import itertools
-import naive
-import icarl
-import replay
-import sys, os
+
 import torch
 import argparse
-import agem
-import ewc
+
 from math import factorial
+import trainer
 
 num_tasks = 5
 parser = argparse.ArgumentParser(description = "Run task ordering simulations")
-parser.add_argument("--strat", dest = "model", type = str)
+parser.add_argument("--strat", dest = "strat", type = str)
 parser.add_argument("--num-perms", dest = "num_perms", default = factorial(num_tasks))
+parser.add_argument("--data", dest = "dataset", default = "cifar10")
+parser.add_argument("--model", dest = "model", default = "simple")
 args = parser.parse_args()
 
-
-data = SplitCIFAR10(n_experiences=num_tasks)
+if args.dataset == "cifar10":
+    data = SplitCIFAR10(n_experiences=num_tasks)
+    num_channels = 3
+elif args.dataset == "smnist":
+    data = SplitMNIST(n_experiences=num_tasks)
+    num_channels = 1
+else: 
+    data = PermutedMNIST(n_experiences=num_tasks)
+    num_channels = 1
 
 
 permutations = itertools.permutations(range(num_tasks), num_tasks)
@@ -39,21 +45,11 @@ for ind, perm in enumerate(permutations):
 
     
     train_set = [i[1] for i in sorted(list(zip(perm, train_set)))]
-    if args.model:
-        if args.model == "naive":
-            results = naive.run(train_set, test_set, data, 10)
-        if args.model == "agem":
-            results = agem.run(train_set, test_set, data, 10)
-        if args.model == "icarl":
-            results = icarl.run(train_set, test_set, data, 10)
-        if args.model == "replay":
-            results = replay.run(train_set, test_set, data, 10)
-        if args.model == "ewc":
-            results = ewc.run(train_set, test_set, data, 10)
-    else: results = naive.run(train_set, test_set, data, 10)
+    results = trainer.run(args.strat, train_set, test_set, data, 10, 
+            num_channels=num_channels, device = "cuda" if torch.cuda.is_available() else "cpu", model = args.model)
+   
 
     for IND, res in enumerate(results):
-        #print(f"AFTER EXPERIENCE {IND}")
         
         for key, val in res.items():
             if key[:-3].endswith("Task") and "eval_phase" in key and "Acc" in key:
@@ -64,7 +60,7 @@ for ind, perm in enumerate(permutations):
         for i in range(num_tasks): data_tensor[ind][0][-1][i] = data_tensor[ind][1][-1][i] = perm[i]      
             
 
-torch.save(data_tensor, f"{model}.pt")
+torch.save(data_tensor, f"{args.strat}.pt")
 
       
     
