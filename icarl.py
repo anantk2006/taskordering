@@ -32,12 +32,12 @@ def icarl_cifar100_augment_data(img):
     return t
 
 
-def icarl_scifar100(override_args=None):
+def run(train, test, benchmark, num_classes):
     
-    nb_exp = 10
-    batch_size = 128
-    memory_size = 2000
-    epochs = 70
+    nb_exp = 5
+    batch_size = 10
+    memory_size = 500
+    epochs = 1
     lr_base = 2
     lr_milestones = [49, 63]
     lr_factor = 5
@@ -45,57 +45,46 @@ def icarl_scifar100(override_args=None):
     train_mb_size = 256
     seed = 2222
 
-    # class incremental learning: classes mutual exclusive
-    fixed_class_order = [87, 0, 52, 58, 44, 91, 68, 97, 51, 15,
-                         94, 92, 10, 72, 49, 78, 61, 14, 8, 86,
-                         84, 96, 18, 24, 32, 45, 88, 11, 4, 67,
-                         69, 66, 77, 47, 79, 93, 29, 50, 57, 83,
-                         17, 81, 41, 12, 37, 59, 25, 20, 80, 73,
-                         1, 28, 6, 46, 62, 82, 53, 9, 31, 75,
-                         38, 63, 33, 74, 27, 22, 36, 3, 16, 21,
-                         60, 19, 70, 90, 89, 43, 5, 42, 65, 76,
-                         40, 30, 23, 85, 2, 95, 56, 48, 71, 64,
-                         98, 13, 99, 7, 34, 55, 54, 26, 35, 39]
+    
     
     device = torch.device(f"cuda:{0}"
                           if torch.cuda.is_available() else "cpu")
 
-    benchmark = SplitCIFAR100(n_experiences=nb_exp, 
-                  fixed_class_order=fixed_class_order)
+    
 
     interactive_logger = InteractiveLogger()
     eval_plugin = EvaluationPlugin(
         accuracy_metrics(experience=True, stream=True),
+        loss_metrics(experience=True, stream=True),
+        benchmark=benchmark,
         loggers=[interactive_logger])
 
     # _____________________________Strategy
-    model: IcarlNet = make_icarl_net(num_classes=100)
+    model = make_icarl_net(num_classes=num_classes)
     model.apply(initialize_icarl_net)
 
-    optim = SGD(model.parameters(), lr=args.lr_base,
-                weight_decay=args.wght_decay, momentum=0.9)
+    optim = SGD(model.parameters(), lr=lr_base,
+                weight_decay=wght_decay, momentum=0.9)
     sched = LRSchedulerPlugin(
-        MultiStepLR(optim, args.lr_milestones, gamma=1.0 / args.lr_factor))
+        MultiStepLR(optim, lr_milestones, gamma=1.0 / lr_factor))
 
     strategy = ICaRL(
         model.feature_extractor, model.classifier, optim,
-        args.memory_size,
+        memory_size,
         buffer_transform=transforms.Compose([icarl_cifar100_augment_data]),
-        fixed_memory=True, train_mb_size=args.batch_size,
-        train_epochs=args.epochs, eval_mb_size=args.batch_size,
+        fixed_memory=True, train_mb_size=batch_size,
+        train_epochs=epochs, eval_mb_size=batch_size,
         plugins=[sched], device=device, evaluator=eval_plugin
     )
     # Dict to iCaRL Evaluation Protocol: Average Incremental Accuracy
-    dict_iCaRL_aia = {}
+    
     # ___________________________________________train and eval
-    for i, exp in enumerate(benchmark.train_stream):
+    for i, exp in enumerate(train):
         strategy.train(exp, num_workers=4)
-        res = strategy.eval(benchmark.test_stream[:i + 1], num_workers=4)
-        dict_iCaRL_aia['Top1_Acc_Stream/Exp'+str(i)] = res['Top1_Acc_Stream/eval_phase/test_stream/Task000']
+        res = strategy.eval(test, num_workers=4)
+        yield res
 
-    return dict_iCaRL_aia
+    
 
 
-if __name__ == '__main__':
-    res = icarl_scifar100()
-    print(res)
+

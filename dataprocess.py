@@ -29,6 +29,22 @@ def calculate_BWT(data):
                 if int(perm_data[0][-1][j])>i-1: continue
                 bwts[ind] += perm_data[0][i][int(perm_data[0][-1][j])] - perm_data[0][int(perm_data[0][-1][j])][int(perm_data[0][-1][j])]
     return torch.Tensor([i/(num_tasks*(num_tasks-1)/2) for i in bwts])
+def calculate_accuracy(data):
+    avgs = torch.zeros(len(data))
+    for i, perm_data in enumerate(data):
+        accuracies = perm_data[0][-2]
+        avgs[i] = torch.sum(perm_data[0][-2]).item()/num_tasks
+    return avgs
+
+print(calculate_BWT(naive_data))
+print(calculate_FWT(naive_data))
+print(calculate_forgetting(naive_data))
+print(calculate_accuracy(naive_data))
+
+
+
+
+        
 
 
 
