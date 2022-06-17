@@ -3,11 +3,11 @@ import torch
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.optim import SGD
 from torchvision import transforms
-
+import models
 
 
 from avalanche.benchmarks import SplitCIFAR100
-from avalanche.models import IcarlNet, make_icarl_net, initialize_icarl_net
+
 from avalanche.training.plugins.lr_scheduling import LRSchedulerPlugin
 from avalanche.training.plugins import EvaluationPlugin
 from avalanche.evaluation.metrics import *
@@ -32,7 +32,7 @@ def icarl_cifar100_augment_data(img):
     return t
 
 
-def run(train, test, benchmark, num_classes):
+def run(train, test, benchmark, num_classes, num_channels):
     
     nb_exp = 5
     batch_size = 10
@@ -60,8 +60,8 @@ def run(train, test, benchmark, num_classes):
         loggers=[interactive_logger])
 
     # _____________________________Strategy
-    model = make_icarl_net(num_classes=num_classes)
-    model.apply(initialize_icarl_net)
+    model = models.simpleCNN(num_classes=num_classes, num_channels = num_channels)
+    
 
     optim = SGD(model.parameters(), lr=lr_base,
                 weight_decay=wght_decay, momentum=0.9)

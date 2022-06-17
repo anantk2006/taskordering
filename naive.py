@@ -6,7 +6,7 @@ from torch.nn import CrossEntropyLoss
 from torch.optim import SGD
 from avalanche.evaluation import metrics
 
-def run(train, test, benchmark, num_classes):
+def run(train, test, benchmark, num_classes, num_channels):
     patterns_per_exp = 256
     epochs = 1
     mem_strength = 0.5 
