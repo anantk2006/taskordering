@@ -8,10 +8,12 @@ from avalanche.evaluation import metrics
 from torch.optim.lr_scheduler import MultiStepLR
 from avalanche.training import ICaRL
 from avalanche.training.plugins.lr_scheduling import LRSchedulerPlugin
+from avalanche.models import IcarlNet
 from torchvision import transforms
 import numpy as np
 import torch
 from models import SimpleCNN, MLP
+num_tasks = 5
 def icarl_cifar100_augment_data(img):
     img = img.numpy()
     padded = np.pad(img, ((0, 0), (4, 4), (4, 4)), mode='constant')
@@ -29,6 +31,7 @@ def icarl_cifar100_augment_data(img):
     return t
 
 def run(strat, train, test, benchmark, num_classes, num_channels = 3, device = "cuda", model = "simple"):
+    
     patterns_per_exp = 256
     epochs = 1
     mem_strength = 0.5 
@@ -48,13 +51,13 @@ def run(strat, train, test, benchmark, num_classes, num_channels = 3, device = "
     criterion = CrossEntropyLoss()
     interactive_logger = avl.logging.InteractiveLogger()
     evaluation_plugin = avl.training.plugins.EvaluationPlugin(
-            metrics.accuracy_metrics(epoch=True, experience=True, stream=True), 
-            metrics.loss_metrics(epoch = True, experience= True, stream = True),
+            metrics.accuracy_metrics(experience=True, stream=True), 
+            metrics.loss_metrics(experience= True, stream = True),
             #metrics.forward_transfer_metrics(experience=True),
             loggers=[interactive_logger], benchmark=benchmark)
     
     if strat == "naive":
-        lr = 0.1
+        lr = 0.05
         cl_strategy = avl.training.Naive(
         model, SGD(model.parameters(), lr=lr, momentum=0.), criterion,
         train_mb_size=train_mb_size, train_epochs=epochs, eval_mb_size=128,
@@ -64,6 +67,7 @@ def run(strat, train, test, benchmark, num_classes, num_channels = 3, device = "
         lr_milestones = [49, 63]
         lr_factor = 5
         wght_decay = 0.00001
+        model = IcarlNet(num_classes = 10)
         optim = SGD(model.parameters(), lr=lr_base,
                 weight_decay=wght_decay, momentum=0.9)
         sched = LRSchedulerPlugin(
@@ -77,11 +81,11 @@ def run(strat, train, test, benchmark, num_classes, num_channels = 3, device = "
             plugins=[sched], device=device, evaluator=evaluation_plugin
         )
     if strat == "ewc":
-        lr = 0.05
+        lr = 0.08
         cl_strategy = avl.training.EWC(
             model, SGD(model.parameters(), lr=lr, momentum=0.), criterion,
             train_mb_size=train_mb_size, train_epochs=epochs, eval_mb_size=128,
-            device=device,evaluator=evaluation_plugin, ewc_lambda = 100000, plugins=[])
+            device=device,evaluator=evaluation_plugin, ewc_lambda = 1000000, plugins=[])
     if strat == "agem":
         lr = 0.05
         cl_strategy = avl.training.AGEM(
@@ -94,11 +98,15 @@ def run(strat, train, test, benchmark, num_classes, num_channels = 3, device = "
         
     
     
-    res = None
-    for experience in train:
         
+    
+    for experience in train:
+    
         cl_strategy.train(experience)
-        yield cl_strategy.eval(test)
+        res = cl_strategy.eval(test)
+        yield res
+        
+
     
 
     

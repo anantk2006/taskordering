@@ -1,7 +1,7 @@
 import torch
 import matplotlib.pyplot as plt
-naive_data = torch.load("naive.pt")
-
+naive_data = torch.load("naive_simple_cifar10.pt")
+print(naive_data)
 num_tasks = 5
 def calculate_forgetting(data):
     avg_forgettings = torch.zeros(len(data))
