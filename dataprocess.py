@@ -1,7 +1,7 @@
 import torch
 import matplotlib.pyplot as plt
-naive_data = torch.load("rotated_cifar10_data")
-print(naive_data)
+naive_data = torch.load("rotated_cifar10_data_test1.pt")
+
 
 num_tasks = 4
 def calculate_forgetting(data):
@@ -38,21 +38,33 @@ def calculate_accuracy(data):
         avgs[i] = torch.sum(perm_data[0][-2]).item()/num_tasks
     return avgs
 
+def get_distances(data):
+    ret = torch.zeros(len(data))
+    for ind, tensor in enumerate(data):
+        perm = tensor[0][-1]
+
+        for i in range(1, len(perm)):
+            ret[ind] += abs(perm[i]-perm[i-1])
+    return ret
 
 bwt = calculate_BWT(naive_data)
 fwt = calculate_FWT(naive_data)
 frgtng = calculate_forgetting(naive_data)
 acc = calculate_accuracy(naive_data)
 
+for i in range(len(acc)):    
+    print(f"Permutation: {list(naive_data[i][0][-1])}, Accuracy: {acc[i]}, Forgetting: {frgtng[i]}, FWT: {fwt[i]}, BWT: {bwt[i]}")
 
-fig, axs = plt.subplots(1, 2, tight_layout=True)
+distances = get_distances(naive_data)
+fig, axs = plt.subplots(1,3, tight_layout=True)
 print(fwt.shape, bwt.shape)
 # We can set the number of bins with the *bins* keyword argument.
 #axs[0].hist([int(i*100) for i in list(fwt)], bins=[i*100 for i in [0.4, 0.45, 0.5,0.55,  0.6, 0.65]])
 #axs[1].hist([int(i*100) for i in list(bwt], bins=[i*100 for i in [-0.2, -0.15, -0.1, -0.05, 0, 0.05, 0.1, 0.15]])
-axs[0].hist(fwt.numpy(), bins = 30)
-axs[1].hist(bwt.numpy(), bins = 30)
-plt.show()
+axs[0].hist(acc.numpy(), bins = 30)
+axs[1].hist(frgtng.numpy(), bins = 30)
+axs[2].scatter(distances.numpy(), acc.numpy())
+plt.savefig("4_30.png")
 
 
 
