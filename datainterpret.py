@@ -1,6 +1,6 @@
 import torch
 import matplotlib.pyplot as plt
-naive_data = torch.load("rotated_cifar10_data_test1.pt")
+sample_data = torch.load("30deg5tasks.pt")
 
 
 num_tasks = 4
@@ -46,24 +46,34 @@ def get_distances(data):
         for i in range(1, len(perm)):
             ret[ind] += abs(perm[i]-perm[i-1])
     return ret
-
-bwt = calculate_BWT(naive_data)
-fwt = calculate_FWT(naive_data)
-frgtng = calculate_forgetting(naive_data)
-acc = calculate_accuracy(naive_data)
+def get_displacements(data):
+    ret = torch.zeros(len(data))
+    for ind, tensor in enumerate(data):
+        perm = tensor[0][-1]
+        ret[ind] = perm[-1]+perm[-2]-(perm[0]+perm[1])
+    return ret
+bwt, fwt, frgtng, acc = torch.zeros(size = (120,)),torch.zeros(size = (120,)),torch.zeros(size = (120,)),torch.zeros(size = (120,))
+for sample in sample_data:
+    bwt += calculate_BWT(sample)
+    fwt += calculate_FWT(sample)
+    frgtng += calculate_forgetting(sample)
+    acc += calculate_accuracy(sample)
+bwt, fwt, frgtng, acc = bwt/6, fwt/6, frgtng/6, acc/6
 
 for i in range(len(acc)):    
-    print(f"Permutation: {list(naive_data[i][0][-1])}, Accuracy: {acc[i]}, Forgetting: {frgtng[i]}, FWT: {fwt[i]}, BWT: {bwt[i]}")
+    print(f"Permutation: {sample_data[0][i][0][-1]}, Accuracy: {acc[i]}, Forgetting: {frgtng[i]}, FWT: {fwt[i]}, BWT: {bwt[i]}")
 
-distances = get_distances(naive_data)
-fig, axs = plt.subplots(1,3, tight_layout=True)
+distances = get_distances(sample_data[0])
+disps = get_displacements(sample_data[0])
+fig, axs = plt.subplots(1,4, tight_layout=True)
 print(fwt.shape, bwt.shape)
 # We can set the number of bins with the *bins* keyword argument.
 #axs[0].hist([int(i*100) for i in list(fwt)], bins=[i*100 for i in [0.4, 0.45, 0.5,0.55,  0.6, 0.65]])
 #axs[1].hist([int(i*100) for i in list(bwt], bins=[i*100 for i in [-0.2, -0.15, -0.1, -0.05, 0, 0.05, 0.1, 0.15]])
 axs[0].hist(acc.numpy(), bins = 30)
 axs[1].hist(frgtng.numpy(), bins = 30)
-axs[2].scatter(distances.numpy(), acc.numpy())
+axs[2].scatter(distances.numpy(), acc.numpy(), s = 1)
+axs[3].scatter(disps.numpy(), acc.numpy(), s = 1)
 plt.savefig("4_30.png")
 
 

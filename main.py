@@ -1,4 +1,4 @@
-from concurrent.futures import process
+
 import torch
 from torchvision import transforms
 from torchvision.datasets import CIFAR10
@@ -10,7 +10,7 @@ from time import time as process_time
 import argparse
 import os, sys
 
-sys.stdout = open(os.devnull, "w")
+
 parser = argparse.ArgumentParser(description = "modifies task parameters")
 parser.add_argument("--inc", dest = "increment", default = 30, type = float)
 parser.add_argument("--tasks", dest = "num_tasks", default = 4, type = int)
@@ -21,13 +21,13 @@ parser.add_argument("--data", dest = "dataset", default = "rot")
 parser.add_argument("--gpu", dest = "gpuid", default = "0", type = str)
 
 args = parser.parse_args()
-#torch.manual_seed(0)
+torch.manual_seed(0)
 #torch.use_deterministic_algorithms(True)
 # args.increment = int(args.increment)
 # args.num_tasks = int(args.num_tasks)
 # args.start = int(args.start)
 # args.end = int(args.end)
-
+sys.stdout = open(f"outputfiles/rotatedcifar{args.start}to{args.end}", "w")
 
 class Noise:
     def __init__(self, noise):
@@ -47,17 +47,28 @@ class Rotation:
         
     def __call__(self, X):
         return transforms.functional.rotate(X, self.angle)
+class Brightness:
+    def __init__(self, bright):
+        self.bright = bright
+    def __call__(self, X):
+        return transforms.functional.adjust_brightness(X, self.bright)
 if args.dataset == "noise":
     trans = Noise
-else: trans = Rotation
+    task_range = range(args.num_tasks)
+elif args.dataset == "bright":
+    task_range = range(1, args.num_tasks+1)
+    trans = Brightness
+else:
+    trans = Rotation
+    task_range = range(args.num_tasks)
 
 
 train_data = [((i*args.increment), DataLoader(CIFAR10(root = "data", train = True, download = True, 
         transform = transforms.Compose([transforms.ToTensor(), trans(i*args.increment)])), batch_size = 100, num_workers = 6)) 
- for i in range(args.num_tasks)]
+ for i in task_range]
 test_data = [((i*args.increment), DataLoader(CIFAR10(root = "data", train = False, download = True, 
         transform = transforms.Compose([transforms.ToTensor(), trans(i*args.increment)])), batch_size = 100, num_workers = 6)) 
- for i in range(args.num_tasks)]
+        for i in task_range]
 
 train_data_permutes = list(permute(train_data))
 if args.start>0: 
@@ -84,7 +95,7 @@ def train(model, data, loss_fn, optim):
     
     model.train()
     for _ in range(50):
-        num_corr = 0
+        #num_corr = 0
         #ftime = process_time()
         for ind, (X, Y) in enumerate(data):
         #    print(process_time()-ftime)
@@ -96,7 +107,7 @@ def train(model, data, loss_fn, optim):
             optim.zero_grad()
             loss.backward()
             optim.step()
-            num_corr += torch.sum(torch.argmax(Y_hat, dim = 1)==Y)
+            #num_corr += torch.sum(torch.argmax(Y_hat, dim = 1)==Y)
         
            
 
@@ -152,7 +163,7 @@ for i in range(args.samples):
         data_tensor[i][ind_perm][0][ind_task][:] = acc
         data_tensor[i][ind_perm][1][ind_task][:] = loss
         data_tensor[i][ind_perm][0][-1][ind_task] = inc
-torch.save(data_tensor, f"rotated_cifar_results/{args.num_tasks}_{args.increment}_{args.start}_{args.end}.pt")
+torch.save(data_tensor, f"rotated_cifar_results/{args.num_tasks}_{args.increment}_{args.start}_{args.end}_{args.samples}.pt")
 
 
     
