@@ -1,9 +1,8 @@
 import torch
 import matplotlib.pyplot as plt
-sample_data = torch.load("30deg5tasks.pt")
+sample_data = torch.load("cifar_results/noise_5_003_all_5.pt")
 
-
-num_tasks = 4
+num_tasks = 5
 def calculate_forgetting(data):
     avg_forgettings = torch.zeros(len(data))
     for ind, perm_data in enumerate(data):
@@ -53,15 +52,31 @@ def get_displacements(data):
         ret[ind] = perm[-1]+perm[-2]-(perm[0]+perm[1])
     return ret
 bwt, fwt, frgtng, acc = torch.zeros(size = (120,)),torch.zeros(size = (120,)),torch.zeros(size = (120,)),torch.zeros(size = (120,))
-for sample in sample_data:
-    bwt += calculate_BWT(sample)
-    fwt += calculate_FWT(sample)
-    frgtng += calculate_forgetting(sample)
-    acc += calculate_accuracy(sample)
-bwt, fwt, frgtng, acc = bwt/6, fwt/6, frgtng/6, acc/6
+div_nums = torch.zeros(size = (120,))
+for ind, sample in enumerate(sample_data):
+    acc_add = calculate_accuracy(sample)
+    bwt_add = calculate_BWT(sample)
+    fwt_add = calculate_FWT(sample)
+    frg_add = calculate_forgetting(sample)
+    div_nums += torch.where(acc_add>0, torch.ones(120), torch.zeros(120))
+    bwt += bwt_add
+    fwt += fwt_add
+    frgtng += frg_add
+    acc += acc_add
 
-for i in range(len(acc)):    
-    print(f"Permutation: {sample_data[0][i][0][-1]}, Accuracy: {acc[i]}, Forgetting: {frgtng[i]}, FWT: {fwt[i]}, BWT: {bwt[i]}")
+
+bwt, fwt, frgtng, acc = bwt/div_nums, fwt/div_nums, frgtng/div_nums, acc/div_nums
+for i in range(120):
+    if acc[i]>0.61:
+        print(sample_data[0][i][0][-1])
+for i in range(100):
+    print()
+for i in range(120):
+    if acc[i]<0.61:
+        print(sample_data[0][i][0][-1])
+    
+# for i in range(len(acc)):    
+#     print(f"Permutation: {sample_data[0][i][0][-1]}, Accuracy: {acc[i]}, Forgetting: {frgtng[i]}, FWT: {fwt[i]}, BWT: {bwt[i]}")
 
 distances = get_distances(sample_data[0])
 disps = get_displacements(sample_data[0])
