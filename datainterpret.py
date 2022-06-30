@@ -1,7 +1,10 @@
 import torch
 import matplotlib.pyplot as plt
-sample_data = torch.load("cifar_results/noise_5_003_all_5.pt")
-
+sample_data = torch.load("cifar_results/cifar_noise_5_003_all_5_50.pt")
+# s = torch.zeros(size = (1,120,2,6,5))
+# s[0] = sample_data
+# sample_data = s
+# print(sample_data.shape)
 num_tasks = 5
 def calculate_forgetting(data):
     avg_forgettings = torch.zeros(len(data))
@@ -49,7 +52,7 @@ def get_displacements(data):
     ret = torch.zeros(len(data))
     for ind, tensor in enumerate(data):
         perm = tensor[0][-1]
-        ret[ind] = perm[-1]+perm[-2]-(perm[0]+perm[1])
+        ret[ind] = perm[-1]
     return ret
 bwt, fwt, frgtng, acc = torch.zeros(size = (120,)),torch.zeros(size = (120,)),torch.zeros(size = (120,)),torch.zeros(size = (120,))
 div_nums = torch.zeros(size = (120,))
@@ -58,7 +61,7 @@ for ind, sample in enumerate(sample_data):
     bwt_add = calculate_BWT(sample)
     fwt_add = calculate_FWT(sample)
     frg_add = calculate_forgetting(sample)
-    div_nums += torch.where(acc_add>0, torch.ones(120), torch.zeros(120))
+    div_nums += torch.where(acc_add>0.2, torch.ones(120), torch.zeros(120))
     bwt += bwt_add
     fwt += fwt_add
     frgtng += frg_add
@@ -67,16 +70,16 @@ for ind, sample in enumerate(sample_data):
 
 bwt, fwt, frgtng, acc = bwt/div_nums, fwt/div_nums, frgtng/div_nums, acc/div_nums
 for i in range(120):
-    if acc[i]>0.61:
+    if acc[i]>0.42:
         print(sample_data[0][i][0][-1])
 for i in range(100):
     print()
 for i in range(120):
-    if acc[i]<0.61:
+    if acc[i]<0.42:
         print(sample_data[0][i][0][-1])
     
-# for i in range(len(acc)):    
-#     print(f"Permutation: {sample_data[0][i][0][-1]}, Accuracy: {acc[i]}, Forgetting: {frgtng[i]}, FWT: {fwt[i]}, BWT: {bwt[i]}")
+for i in range(len(acc)):    
+    print(f"Permutation: {sample_data[0][i][0][-1]}, Accuracy: {acc[i]}, Forgetting: {frgtng[i]}, FWT: {fwt[i]}, BWT: {bwt[i]}")
 
 distances = get_distances(sample_data[0])
 disps = get_displacements(sample_data[0])
@@ -85,6 +88,10 @@ print(fwt.shape, bwt.shape)
 # We can set the number of bins with the *bins* keyword argument.
 #axs[0].hist([int(i*100) for i in list(fwt)], bins=[i*100 for i in [0.4, 0.45, 0.5,0.55,  0.6, 0.65]])
 #axs[1].hist([int(i*100) for i in list(bwt], bins=[i*100 for i in [-0.2, -0.15, -0.1, -0.05, 0, 0.05, 0.1, 0.15]])
+# id = [i<0.3 for i in acc].index(True)
+# acc = torch.Tensor([val for i,val in enumerate(acc) if i!=id])
+# distances = torch.Tensor([val for i,val in enumerate(distances) if i!=id])
+# disps = torch.Tensor([val for i,val in enumerate(disps) if i!=id])
 axs[0].hist(acc.numpy(), bins = 30)
 axs[1].hist(frgtng.numpy(), bins = 30)
 axs[2].scatter(distances.numpy(), acc.numpy(), s = 1)
