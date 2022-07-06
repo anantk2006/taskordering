@@ -1,6 +1,10 @@
 import torch
 import matplotlib.pyplot as plt
-sample_data = torch.load("cifar_results/cifar_noise_5_003_all_5_50.pt")
+
+sample_data = torch.load("mnist_results/cifar_rot_5_30_all_5_resnet.pt")
+
+sample_data = sample_data.permute(1, 0, 2, 3, 4)
+print(sample_data.shape)
 # s = torch.zeros(size = (1,120,2,6,5))
 # s[0] = sample_data
 # sample_data = s
@@ -78,8 +82,13 @@ for i in range(120):
     if acc[i]<0.42:
         print(sample_data[0][i][0][-1])
     
-for i in range(len(acc)):    
-    print(f"Permutation: {sample_data[0][i][0][-1]}, Accuracy: {acc[i]}, Forgetting: {frgtng[i]}, FWT: {fwt[i]}, BWT: {bwt[i]}")
+acc_list = list(acc)
+l = zip(acc_list, list(torch.arange(120)))
+l = sorted(l)
+
+for i in range(len(l)):    
+    ii = l[i][1]
+    print(f"Permutation: {sample_data[0][ii][0][-1]}, Accuracy: {acc[ii]}, Forgetting: {frgtng[ii]}, FWT: {fwt[ii]}, BWT: {bwt[ii]}")
 
 distances = get_distances(sample_data[0])
 disps = get_displacements(sample_data[0])
@@ -96,7 +105,7 @@ axs[0].hist(acc.numpy(), bins = 30)
 axs[1].hist(frgtng.numpy(), bins = 30)
 axs[2].scatter(distances.numpy(), acc.numpy(), s = 1)
 axs[3].scatter(disps.numpy(), acc.numpy(), s = 1)
-plt.savefig("4_30.png")
+plt.savefig("graphs/mnistrot.png")
 
 
 

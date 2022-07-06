@@ -1,9 +1,8 @@
 import torch
-
-
-t = [torch.load(f"cifar_results/cifar_rot_5_30_{i}_{i+15}_1_20.pt") for i in range(0, 120, 15)]
-data_tensor5 = torch.cat(t, dim = 1)
-
-torch.save(data_tensor5, "cifar_results/cifar_rot_5_30_all_1_20.pt")
-
-    
+full_data = []
+for i in range(120):
+    index_tensor = []
+    for j in range(5):
+        index_tensor.append(torch.load(f"mnist_results/mnist_noise_5_0_{i}_{j}_resnet.pt").unsqueeze(0))
+    full_data.append(torch.cat(index_tensor, dim = 0).unsqueeze(0))
+torch.save(torch.cat(full_data, dim = 0), "mnist_results/mnist_noise_5_003_all_5_resnet.pt")

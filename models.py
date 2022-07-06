@@ -1,4 +1,8 @@
 import torch.nn as nn
+class ResNet(nn.Module):
+    def __init__(self, num):
+        super().__init__()
+
 class SimpleCNN(nn.Module):
     def __init__(self, num_classes=10, num_channels = 1):
         super(SimpleCNN, self).__init__()
