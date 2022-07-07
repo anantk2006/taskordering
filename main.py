@@ -13,40 +13,35 @@ import numpy
 import random
 from strategies import Naive, Replay
 
-#torch.use_deterministic_algorithms(True)
+
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
 parser = argparse.ArgumentParser(description = "modifies task parameters")
-parser.add_argument("--inc", dest = "increment", default = 30, type = float)
-parser.add_argument("--tasks", dest = "num_tasks", default = 4, type = int)
-parser.add_argument("--index", dest = "index", default = 0, type = int)
-parser.add_argument("--mod", dest = "transform", default = "rot")
+parser.add_argument("--inc", dest = "increment", default = 30, type = float, help = "the level of difference between tasks")
+parser.add_argument("--tasks", dest = "num_tasks", default = 4, type = int, help = "number of tasks")
+parser.add_argument("--index", dest = "index", default = 0, type = int, help = "index of permutations i.e. 0-120 for 5 tasks")
+parser.add_argument("--mod", dest = "transform", default = "rot", help = "the type of transform, rotation, noise, or brightness")
 
-parser.add_argument("--gpu", dest = "gpuid", default = "0", type = str)
-parser.add_argument("--seed", dest = "seed", default = 0, type = int)
-parser.add_argument("--print", dest = "print", default = "term", type = str)
-parser.add_argument("--data", dest = "dataset", default = "cifar", type = str)
+parser.add_argument("--gpu", dest = "gpuid", default = "0", type = str, help = "gpu id to be used")
+parser.add_argument("--seed", dest = "seed", default = 0, type = int, help = "seeding for the program for reproducibility")
+parser.add_argument("--print", dest = "print", default = "term", type = str, help = "where to print")
+parser.add_argument("--data", dest = "dataset", default = "cifar", type = str, help = "dataset to be used")
 
-parser.add_argument("--model", dest=  "model", default = "resnet")
-parser.add_argument("--train-until", dest = "loop", default = "epochs")
-parser.add_argument("--epochs", dest = "epochs", default = 30, type = int)
-parser.add_argument("--lr", dest = "lr", default=0.1, type = float)
-parser.add_argument("--loss-thres", dest = "dloss", default = 0.1, type = float)
+parser.add_argument("--model", dest=  "model", default = "resnet",help = "CNN to be used")
+parser.add_argument("--train-until", dest = "loop", default = "epochs", help = "how should training be terminated")
+parser.add_argument("--epochs", dest = "epochs", default = 30, type = int, help="number of epochs")
+parser.add_argument("--lr", dest = "lr", default=0.1, type = float, help = "learning rate")
+parser.add_argument("--loss-thres", dest = "dloss", default = 0.1, type = float, help = "threshold if training until loss")
 
-parser.add_argument("--strat", dest = "strat", default = "naive", type = str)
-parser.add_argument("--num-examples", dest = "num_examples", type = int, default = 1000)
+parser.add_argument("--strat", dest = "strat", default = "naive", type = str, help = "continual learning strategy")
+parser.add_argument("--num-examples", dest = "num_examples", type = int, default = 1000, help = "number of training pairs to be stored")
 
 args = parser.parse_args()
 numpy.random.seed(args.seed)
-random.seed(args.seed)
+random.seed(args.seed) #seeding for reproducibility
 torch.manual_seed(args.seed)
-#torch.manual_seed(args.seed)
-#torch.use_deterministic_algorithms(True)
-# args.increment = int(args.increment)
-# args.num_tasks = int(args.num_tasks)
-# args.start = int(args.start)
-# args.end = int(args.end)
-if args.print == "file":
+
+if args.print == "file": #print to file if desired
     sys.stdout = open(f"outputs/{args.dataset}_{args.transform}_{args.num_tasks}_{int(args.increment)}_{args.index}.txt", "w")
 
 class Noise:
@@ -56,26 +51,29 @@ class Noise:
         return torch.normal(X, self.noise)
 class Rotation:
     def __init__(self, angle):
-        self.angle = angle        
+        self.angle = angle        # custom transforms to augment dataset for continual learning
     def __call__(self, X):
         return transforms.functional.rotate(X, self.angle)
-class RepeatChannels:
-    def __init__(self, num_reps):
-        self.num_reps = num_reps
-    def __call__(self, X):
-        return X.repeat(self.num_reps, 1, 1)
 class Brightness:
     def __init__(self, bright):
         self.bright = bright
     def __call__(self, X):
         return transforms.functional.adjust_brightness(X, self.bright+0.4)
+
+
+class RepeatChannels:
+    def __init__(self, num_reps):
+        self.num_reps = num_reps
+    def __call__(self, X): #in order to reformat images to CNN specifications for resnet
+        return X.repeat(self.num_reps, 1, 1)
+
 if args.transform == "noise":
     trans = Noise
     
 elif args.transform == "bright":
     
     trans = Brightness
-else:
+else:    #uses cmd line to choose
     trans = Rotation
     
 if args.dataset == "cifar":
@@ -91,58 +89,37 @@ VARS = {"transforms": {"cifar": {"resnet": [transforms.Resize(224)], "simple": [
 
 
 
-
+#deciding all transforms and loading the data
 
 train_data = [((i*args.increment), DataLoader(data_class(root = "data", train = True, download = True, 
-        transform = transforms.Compose([transforms.ToTensor(), trans(i*args.increment), *VARS["transforms"][args.dataset][args.model]])), batch_size = 100, shuffle = True))
+        transform = transforms.Compose([transforms.ToTensor(), trans(i*args.increment), *VARS["transforms"][args.dataset][args.model]])), batch_size = 100, shuffle = True, num_workers = 6))
  for i in range(args.num_tasks)]
 test_data = [((i*args.increment), DataLoader(data_class(root = "data", train = False, download = True, 
-        transform = transforms.Compose([transforms.ToTensor(), trans(i*args.increment), *VARS["transforms"][args.dataset][args.model] ])), batch_size = 100, shuffle = True))
+        transform = transforms.Compose([transforms.ToTensor(), trans(i*args.increment), *VARS["transforms"][args.dataset][args.model] ])), batch_size = 100, shuffle = True, num_workers = 6))
  for i in range(args.num_tasks)]
 
-train_data_permutes = list(permute(train_data))
+train_data_permutes = list(permute(train_data)) #permutation to be used
 train_data_permutes = train_data_permutes[args.index]
 
-data_tensor = torch.zeros(2, args.num_tasks+1, args.num_tasks)
+data_tensor = torch.zeros(2, args.num_tasks+1, args.num_tasks) #results tensor to be saved
 
 if torch.cuda.is_available(): device = torch.device("cuda:"+str(int(args.gpuid)))
 else: device = torch.device("cpu")
-# for data in train_data_permutes[0]:
-#     for X, Y in data[1]:
-        
-#         X = X.to(device); Y.to(device)
-    
-# for data in test_data:
-#     for X, Y in data[1]:
-        
-        
-#cpu = torch.device("cpu")
 
-def train(model, data, loss_fn, optim):
-        
-    model.train()
-    loss_agg = 2.5
-    loss_num = 1
-    ep = 0
-    while (loss_agg/loss_num>args.dloss if args.loop == "loss" else ep<args.epochs):        
-        for ind, (X, Y) in enumerate(data):          
-            X = X.to(device); Y = Y.to(device)
-            Y_hat = model(X)
-            loss = loss_fn(Y_hat, Y)
-            optim.zero_grad()
-            loss.backward()
-            l = float(loss)
-            loss_agg+=l
-            loss_num+=1
-            if ind>100 and loss_agg/loss_num<args.dloss and args.loop == "loss": break
-            optim.step()
-        loss_agg, loss_num = loss_agg/loss_num, 1 
-        ep+=1
-        
-           
 
-cpu = torch.device("cpu")
-def test_results(model, test_data, loss_fn):
+
+
+        
+
+
+
+loss_fn = torch.nn.CrossEntropyLoss()
+def init_weights(m):
+    if isinstance(m, torch.nn.Linear): 
+        torch.nn.init.xavier_uniform_(m.weight)
+        m.bias.data.fill_(0.01)
+
+def test_results(model, test_data, loss_fn, args, device):
     model.eval()
     tim = process_time()
     acc = torch.zeros(size  = (args.num_tasks,), device = device)
@@ -156,7 +133,7 @@ def test_results(model, test_data, loss_fn):
             num_done += 1
             X = X.to(device); Y = Y.to(device)
             Y_hat = model(X)
-            loss_curr = loss_fn(Y_hat, Y)
+            loss_curr = loss_fn(Y_hat, Y) #testing procedure, measures both accuracy and loss for all tasks
             loss_agg += float(loss_curr)
             num_correct = torch.sum(torch.argmax(Y_hat, dim = 1)==Y)
             acc_agg += num_correct
@@ -166,17 +143,7 @@ def test_results(model, test_data, loss_fn):
     #print(process_time()-tim)
     return acc, loss
 
-        
-
-
-
-loss_fn = torch.nn.CrossEntropyLoss()
-def init_weights(m):
-    if isinstance(m, torch.nn.Linear):
-        torch.nn.init.xavier_uniform_(m.weight)
-        m.bias.data.fill_(0.01)
-
-  
+  #initialization of everything
 
 if args.model == "resnet":
     model = torchvision.models.resnet18(pretrained=False).to(device)
@@ -188,12 +155,11 @@ if args.strat == "naive":
 else: strategy = Replay(args.num_examples, args)
 model.apply(init_weights)
 optim = torch.optim.SGD(model.parameters(), lr = args.lr)
-for ind_task, (inc, data) in enumerate(train_data_permutes):
+for ind_task, (inc, data) in enumerate(train_data_permutes): #trains model on every task
     init_time = process_time()
     strategy.train(model, data, loss_fn, optim, args, device)
-    acc, loss = strategy.test_results(model, test_data, loss_fn, args, device)
-    # train(model, data, loss_fn, optim)
-    # acc, loss = test_results(model, test_data, loss_fn)
+    acc, loss = test_results(model, test_data, loss_fn, args, device)
+    
     print(f"Task number: {ind_task}      Task increment: {inc}" )
     print(f"Accuracies: {acc}      Losses: {loss}")
     print(f"Time taken: {round(process_time()-init_time, 2)}")
