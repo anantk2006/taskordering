@@ -2,7 +2,7 @@ import torch
 import matplotlib.pyplot as plt
 from math import factorial
 
-sample_data = torch.load("cifar_results/cifar_rot_5_30_all_5.pt")
+sample_data = torch.load("mnist_results/mnist_rot_5_30_all_5_resnet_replay.pt")
 num_tasks = 5
 num_perms = factorial(num_tasks)
 #sample_data = sample_data.reshape(5, num_perms, 2, num_tasks+1, num_tasks)
@@ -58,7 +58,8 @@ def get_distances(data):
         perm = tensor[0][-1]
 
         for i in range(1, len(perm)):
-            ret[ind] += abs(perm[i]-perm[i-1])
+            d = int(abs(perm[i]-perm[i-1]))
+            ret[ind] += d
     return ret
 def get_displacements(data):
     ret = torch.zeros(len(data))
@@ -111,13 +112,13 @@ fig, axs = plt.subplots(1,2, tight_layout=True)
 print(fwt.shape, bwt.shape)
 dic = {}
 for ind, val in enumerate(distances):
-    print(ind, val)
+    
     v = round(float(val))
     if v in dic: dic[v].append(float(acc[ind]))
     else: dic[v] = [float(acc[ind])]
 
-axs[0].scatter(distances.numpy(), acc.numpy(), s = 1)
-#axs[0].set_xticklabels(dic.keys())
+axs[0].boxplot(dic.values())
+axs[0].set_xticklabels(dic.keys())
 # #axs[1].hist(frgtng.numpy(), bins = 30)
 
 dic = {}

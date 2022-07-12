@@ -14,6 +14,7 @@ import random
 from strategies import Naive, Replay
 
 
+
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
 parser = argparse.ArgumentParser(description = "modifies task parameters")
@@ -58,7 +59,7 @@ class Brightness:
     def __init__(self, bright):
         self.bright = bright
     def __call__(self, X):
-        return transforms.functional.adjust_brightness(X, self.bright+0.4)
+        return transforms.functional.adjust_brightness(X, self.bright+0.5)
 
 
 class RepeatChannels:
@@ -92,17 +93,27 @@ VARS = {"transforms": {"cifar": {"resnet": [transforms.Resize(224)], "simple": [
 
 #deciding all transforms and loading the data
 
-train_data = [((i*args.increment), DataLoader(data_class(root = "data", train = True, download = True, 
-        transform = transforms.Compose([transforms.ToTensor(), trans(i*args.increment), *VARS["transforms"][args.dataset][args.model]])), batch_size = 100, shuffle = True, num_workers = 6))
- for i in range(args.num_tasks)]
-test_data = [((i*args.increment), DataLoader(data_class(root = "data", train = False, download = True, 
-        transform = transforms.Compose([transforms.ToTensor(), trans(i*args.increment), *VARS["transforms"][args.dataset][args.model] ])), batch_size = 100, shuffle = True, num_workers = 6))
- for i in range(args.num_tasks)]
-
-train_data_permutes = list(permute(train_data)) #permutation to be used
+# train_data = [((i*args.increment), DataLoader(data_class(root = "data", train = True, download = True, 
+#         transform = transforms.Compose([transforms.ToTensor(), trans(i*args.increment), *VARS["transforms"][args.dataset][args.model]])), batch_size = 100, shuffle = True, num_workers = 6))
+#  for i in range(args.num_tasks)]
+# test_data = [((i*args.increment), DataLoader(data_class(root = "data", train = False, download = True, 
+#         transform = transforms.Compose([transforms.ToTensor(), trans(i*args.increment), *VARS["transforms"][args.dataset][args.model] ])), batch_size = 100, shuffle = True, num_workers = 6))
+#  for i in range(args.num_tasks)]
+train_data = []
+test_data = []
+for i in range(3):
+    for j in range(3):
+        train_data.append(((i*args.increment, j*0.5), DataLoader(data_class(root = "data", train = True, download = True, 
+        transform = transforms.Compose([transforms.ToTensor(),  trans(i*args.increment),Noise(j*0.25), *VARS["transforms"][args.dataset][args.model]])), batch_size = 100, shuffle = True, num_workers = 6)))
+        test_data.append(((i*args.increment, j*0.5), DataLoader(data_class(root = "data", train = False, download = True, 
+        transform = transforms.Compose([transforms.ToTensor(), trans(i*args.increment), Noise(j*0.25), *VARS["transforms"][args.dataset][args.model] ])), batch_size = 100, shuffle = True, num_workers = 6)))
+ 
+# print(args.index)
+# exit()
+train_data_permutes = list(permute(train_data, 9)) #permutation to be used
 train_data_permutes = train_data_permutes[args.index]
 
-data_tensor = torch.zeros(2, args.num_tasks+1, args.num_tasks) #results tensor to be saved
+data_tensor = torch.zeros(2, 10, 9) #results tensor to be saved
 
 if torch.cuda.is_available(): device = torch.device("cuda:"+str(int(args.gpuid)))
 else: device = torch.device("cpu")
@@ -123,9 +134,10 @@ def init_weights(m):
 def test_results(model, test_data, loss_fn, args, device):
     model.eval()
     tim = process_time()
-    acc = torch.zeros(size  = (args.num_tasks,), device = device)
-    loss = torch.zeros(size = (args.num_tasks,), device = device)
+    acc = torch.zeros(size  = (args.num_tasks**2,), device = device)
+    loss = torch.zeros(size = (args.num_tasks**2,), device = device)
     for ind, (_, te_data) in enumerate(test_data):
+        
         loss_agg = 0
         acc_agg = 0
         num_done = 0
@@ -166,8 +178,8 @@ for ind_task, (inc, data) in enumerate(train_data_permutes): #trains model on ev
     print(f"Time taken: {round(process_time()-init_time, 2)}")
     data_tensor[0][ind_task][:] = acc
     data_tensor[1][ind_task][:] = loss
-    data_tensor[0][-1][ind_task] = inc
-torch.save(data_tensor, f"mnist_results/{args.dataset}_{args.transform}_{args.num_tasks}_{int(args.increment)}_{args.index}_{args.seed}_{args.model}.pt")
+    data_tensor[0][-1][ind_task] = inc[0] + inc[1]
+torch.save(data_tensor, f"mnist_results/{args.dataset}_{args.transform}_{9}_{int(args.increment)}_{args.index}_{args.seed}_{args.model}.pt")
 
 
     

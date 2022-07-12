@@ -1,8 +1,10 @@
+from numpy import float16
 import torch
 import torch.nn as nn
 from time import time as process_time
 from torch.utils.data import DataLoader
-
+from PIL import Image
+import numpy
 
 
 class Naive:
@@ -19,7 +21,12 @@ class Naive:
         ep = 0
         while (loss_agg/loss_num>args.dloss if args.loop == "loss" else ep<args.epochs):
             #either end on epoch or end after certain loss threshold
-            for ind, (X, Y) in enumerate(data):          
+            for ind, (X, Y) in enumerate(data): 
+                # if ind == 0:
+                    
+                #     print(X[0].permute(1, 2, 0).cpu().numpy().shape)
+                #     da = Image.fromarray((X[0][0]*256).permute(1, 2, 0).cpu().numpy().astype(numpy.uint8))
+                #     da.save("graphs/im.png")            
                 X = X.to(device); Y = Y.to(device)
                 Y_hat = model(X)
                 loss = loss_fn(Y_hat, Y)
@@ -76,7 +83,8 @@ class Replay:
                 if i: temp.append(iter(i))
                 else: temp.append(None)
 
-            for ind, (X, Y) in enumerate(data):          
+            for ind, (X, Y) in enumerate(data):     
+                
                 X = X.to(device); Y = Y.to(device)
                 optim.zero_grad()
                 
