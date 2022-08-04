@@ -51,7 +51,7 @@ class Replay:
         self.num_examples = num_examples
         self.examples = []
         self.task_ind = 0
-        self.dataloaders = [None]*args.num_tasks
+        self.dataloaders = [None]*9
         
         
     def reconstruct_examples(self):

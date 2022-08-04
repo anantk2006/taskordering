@@ -104,9 +104,9 @@ test_data = []
 for i in range(3):
     for j in range(3):
         train_data.append(((i*args.increment, j*0.5), DataLoader(data_class(root = "data", train = True, download = True, 
-        transform = transforms.Compose([transforms.ToTensor(),  trans(i*args.increment),Noise(j*0.25), *VARS["transforms"][args.dataset][args.model]])), batch_size = 100, shuffle = True, num_workers = 6)))
+        transform = transforms.Compose([transforms.ToTensor(),  trans(i*args.increment), Brightness(j*0.5), *VARS["transforms"][args.dataset][args.model]])), batch_size = 100, shuffle = True, num_workers = 6)))
         test_data.append(((i*args.increment, j*0.5), DataLoader(data_class(root = "data", train = False, download = True, 
-        transform = transforms.Compose([transforms.ToTensor(), trans(i*args.increment), Noise(j*0.25), *VARS["transforms"][args.dataset][args.model] ])), batch_size = 100, shuffle = True, num_workers = 6)))
+        transform = transforms.Compose([transforms.ToTensor(), trans(i*args.increment), Brightness(j*0.5), *VARS["transforms"][args.dataset][args.model] ])), batch_size = 100, shuffle = True, num_workers = 6)))
  
 # print(args.index)
 # exit()
