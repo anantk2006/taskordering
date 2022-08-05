@@ -7,13 +7,13 @@ from itertools import permutations as permute
 import time
 from math import factorial
 
-DIM = 7
+DIM = 40
 NUM_TASKS = 5
-INC = 1/6 * pi
-DSIZE = 100
+INC = 1/3 * pi
+DSIZE = 150
 GPU = 3
 
-w_star = torch.rand(7)*2-1
+w_star = torch.rand(DIM)*2-1
 span_ws = [torch.Tensor([1]*(DIM-2)+[sin(x*INC), cos(x*INC)]) for x in range(NUM_TASKS)]
 
 features = []
@@ -25,7 +25,7 @@ for w in span_ws:
         last_col = X @ w.unsqueeze(-1) 
           
         X.mT[0] = -last_col.squeeze(-1)/w[0]
-        large = torch.abs(X.mT[0])>5        
+        large = torch.abs(X.mT[0])>1000        
         if any(large): continue
         features.append(X)
 labels = [torch.where((X @ w_star.unsqueeze(-1))>0, 1, 0) for X in features]
@@ -87,7 +87,7 @@ class LogisticRegression(nn.Module):
             count+=len(feat)
         
         return acc_agg/count   
-device = torch.device(f"cpu")
+device = torch.device(f"cuda:{GPU}")
 all_data  = LRDataset(torch.cat(features, dim  = 0), torch.cat(labels, dim = 0))
 all_data = DataLoader(all_data, shuffle = True, batch_size= 50)
 
@@ -118,7 +118,7 @@ for ind, dataset in enumerate(dataloaders):
     for task_ind in range(NUM_TASKS):
         if task_ind>0: 
             distance+=abs(permutation[task_ind]*INC-permutation[task_ind-1]*INC)
-            print(model.coef_-W_star.to(device)) 
+            #print(model.coef_-W_star.to(device)) 
             print(get_accuracies(model, dataloaders[0])) 
         model.fit(dataset[task_ind])
     print(model.coef_-W_star.to(device))
