@@ -11,10 +11,10 @@ import sys; args = sys.argv[1:]
 
 #sys.stdout = open("logregv5out.txt", "w")
 
-DIM = 501
+DIM = 701
 NUM_TASKS = 5
-INC = 2/45 * pi
-DSIZE = 500
+INC = 1/12* pi
+DSIZE = 700
 GPU = 3
 SEED = int(args[0])+10
 FUNC = "log"
@@ -70,6 +70,7 @@ span_ws = torch.Tensor([[0]*(DIM-ZEROS-2)+endings[x].tolist() for x in range(NUM
 
 features = []
 i = 0
+
 for w in span_ws:
     prev = len(features)
     while len(features)==prev:
@@ -92,7 +93,7 @@ def ortho(w_star, ws):
         w_star = w_star - torch.dot(w_star, w)/(torch.dot(w,w))*w
     return w_star
 while True:
-    w_star = ortho(torch.rand(DIM)*2-1)
+    w_star = ortho(torch.rand(DIM)*2-1, span_ws)
     if FUNC == "log": labels = [torch.where((X @ w_star.unsqueeze(-1))>0, 1, 0) for X in features]
     else: labels = [X @ w_star.unsqueeze(-1) for X in features]
     if FUNC == "lin": break
@@ -224,11 +225,11 @@ def get_distances(w, w_s):
 
 dataloaders = list(permute(dataloaders, NUM_TASKS))
 results = torch.zeros(factorial(NUM_TASKS), 4)
-w_distances = torch.zeros(factorial(NUM_TASKS), 5)
+w_distances = torch.zeros(factorial(NUM_TASKS), NUM_TASKS)
 torch.set_printoptions(sci_mode=False, precision=20)
 W_star = W_star.to(device)
 
-losses = torch.zeros(factorial(NUM_TASKS), 6, 5) 
+losses = torch.zeros(factorial(NUM_TASKS), NUM_TASKS+1, NUM_TASKS) 
 for ind, dataset in enumerate(dataloaders):
   
     model = Regression().to(device)
