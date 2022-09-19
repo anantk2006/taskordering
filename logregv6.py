@@ -11,21 +11,25 @@ import sys; args = sys.argv[1:]
 
 #sys.stdout = open("logregv5out.txt", "w")
 
-DIM = 701
+DIM = 251
 NUM_TASKS = 5
 INC = 1/12* pi
-DSIZE = 700
+DSIZE = 250
 GPU = 3
 SEED = int(args[0])+10
 FUNC = "log"
 CYCLES = 1
 ZEROS = 4
-lr = 0.1 if FUNC == "lin" else 0.2
+lr = 0.5 if FUNC == "lin" else 0.2
 device = torch.device(f"cuda:{GPU}" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(SEED)
 random.seed(SEED)
 numpy.random.seed(SEED)
 from scipy.linalg import orth
+import scipy
+ang_bet  = lambda a, b: torch.dot(a,b)/(torch.linalg.norm(b)*torch.linalg.norm(a))
+proj = lambda a, b: (torch.dot(a, b)/torch.dot(b, b))*b
+
 
 def get_matrix(N):
     Phi = numpy.random.randn(N, N).astype(numpy.float32)
@@ -34,21 +38,23 @@ def get_matrix(N):
 def rot(w):
     while True:
         M = get_matrix(w.shape[0])
-        if torch.abs(M@w).min()<0.12: continue
+        #if torch.abs(M@w).min()<0.12: continue
         return M @ w
 
-#span_ws = torch.Tensor([[0]*(DIM-2)+[sin((x+2.5)*INC) if abs(sin((x+2.5)*INC))>0.01 else 0, cos((x+2.5)*INC) if cos((x+2.5)*INC)>0.01 else 0] for x in range(NUM_TASKS)])
+span_ws = torch.Tensor([[0]*(DIM-2)+[sin((x+2.5)*INC) if abs(sin((x+2.5)*INC))>0.01 else 0, cos((x+2.5)*INC) if cos((x+2.5)*INC)>0.01 else 0] for x in range(NUM_TASKS)])
+
 # endings = []
 # for k in [-1, 0, 1]:
 #     for method in {(lambda x: 0, cos, sin), (sin, cos, lambda x: 0)}:
 #         endings.append([0, 0]+[m(k*INC) for m in method])
 # endings = torch.Tensor(endings[:3]+endings[4:])
 
-endings = torch.Tensor([[0]*ZEROS + [sin((x+2.5)*INC) if abs(sin((x+2.5)*INC))>0.01 else 0, cos((x+2.5)*INC) if abs(cos((x+2.5)*INC))>0.01 else 0] for x in range(NUM_TASKS)])
+# endings = torch.Tensor([[0]*ZEROS + [sin((x+2.5)*INC) if abs(sin((x+2.5)*INC))>0.01 else 0, cos((x+2.5)*INC) if abs(cos((x+2.5)*INC))>0.01 else 0] for x in range(NUM_TASKS)])
 
-endings = rot(endings.T).T
-#endings[1], endings[3] = endings[3], endings[1]
-span_ws = torch.Tensor([[0]*(DIM-ZEROS-2)+endings[x].tolist() for x in range(NUM_TASKS)])
+# endings = rot(endings.T).T
+# #endings[1], endings[3] = endings[3], endings[1]
+# span_ws = torch.Tensor([[0]*(DIM-ZEROS-2)+endings[x].tolist() for x in range(NUM_TASKS)])
+span_ws = rot(span_ws.T).T
 
 
 # print(endings)
@@ -70,23 +76,55 @@ span_ws = torch.Tensor([[0]*(DIM-ZEROS-2)+endings[x].tolist() for x in range(NUM
 
 features = []
 i = 0
-
-for w in span_ws:
+error = 5
+for ind, w in enumerate(span_ws):
     prev = len(features)
-    while len(features)==prev:
-        X = torch.normal(torch.zeros(DSIZE, DIM), 4)
-        for i in range(DIM-2, DIM):
-            if w[i]!=0: break
-        X[:, i] = torch.zeros(DSIZE)
-        last_col = X @ w.unsqueeze(-1) 
+    while len(features) == prev:
+        X = torch.zeros((DSIZE, DIM))
+        e_sum = 0
+        for i in range(DSIZE):
+            
+            nums = set(range(DIM))
+            
+            while len(nums)>1:
+                n = nums.pop()
+                c_sum = torch.dot(X[i], w)
+                
+                
+                errors = torch.Tensor([error-c_sum, -c_sum-error])/w[n]
+                e_sum += errors[0]-errors[1]
+                zero = -c_sum/w[n]      
+                
+                if abs(errors[1])>3:
+                    errors[1] = 3*(errors[1]/abs(errors[1]))
+                if abs(errors[0])>3:
+                    errors[0] = 3*(errors[0]/abs(errors[0]))
+                
+                X[i][n] = random.random()*(errors[0]-errors[1])+errors[1]
+                # if abs(X[i][n] - zero)>(errors[1]-errors[0])/4: break 
+                
+                
+            n = nums.pop()
+            X[i][n] = -torch.dot(X[i], w)/w[n]
+            
+        print(e_sum/(DIM*DSIZE))
+        if numpy.linalg.matrix_rank(X)==DSIZE:
+            features.append(X)
+        x = torch.from_numpy(scipy.linalg.null_space(X))
+        print(X)
+        print(x.shape)
+        print(w)
+        for iind, i in enumerate(x.mT):
+            for jind, j in enumerate(x.mT):
+                print(ang_bet(i, j))
+                print("x", ang_bet(w, j))
         
-        
-        X[:, i] = -last_col.squeeze(-1)/w[i]
-        #print(-last_col.squeeze(-1)/w[i]) 
-        if torch.abs(last_col/w[i]).max()>150: continue
-        #if torch.linalg.matrix_rank(X)!=DIM-1: continue
-        
-        features.append(X)
+exit()
+
+
+
+    
+
 def ortho(w_star, ws):
     for w in orth(ws.T).T:
         w = torch.Tensor(w)
@@ -96,11 +134,13 @@ while True:
     w_star = ortho(torch.rand(DIM)*2-1, span_ws)
     if FUNC == "log": labels = [torch.where((X @ w_star.unsqueeze(-1))>0, 1, 0) for X in features]
     else: labels = [X @ w_star.unsqueeze(-1) for X in features]
+
     if FUNC == "lin": break
 
     for label in labels:
         if label.sum()>DSIZE//3 or label.sum()<DSIZE/1.5: continue
     break
+#print(torch.dot(features[0][0], span_ws[0]))
 
 
 
@@ -141,13 +181,15 @@ class Regression(nn.Module):
         self.optim = torch.optim.SGD(self.net.parameters(), lr = lr)
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optim, lambda epoch: lr/sqrt(epoch+1))
         t = time.time()
-        while ((p:=self.test(dataset)[1])>0.005) if FUNC == "lin" else (p:=self.test(dataset)[0]<1) if not all_data else time.time()-t<5:
-            #print(p)
+        
+        while ((p:=self.test(dataset)[1])>0.01) if FUNC == "lin" else (p:=self.test(dataset)[0]<1) if not all_data else time.time()-t<5:
+            
             for features, labels in dataset:   
                 #if torch.abs(features).max()>: raise Exception("Features too large")             
                 self.optim.zero_grad()
                 preds = self(features).unsqueeze(-1) #iterate through dataloader
                 loss = self.loss_fn(preds.flatten(), labels.flatten().to(torch.float32)) #calculate loss
+                
                 if time.time()-t>60:
                     
                     with open("debug_loss.txt", "a+") as f:                    
@@ -164,9 +206,10 @@ class Regression(nn.Module):
                 #     print("X, ",self.linear.weight.data)
                 #     exit()
                 #print(torch.linalg.norm(self.linear.weight.grad))
+                torch.nn.utils.clip_grad_norm_(self.net.parameters(), 4)
                 self.optim.step()
              
-            self.scheduler.step()
+            #self.scheduler.step()
         self.coef_ = self.linear.weight.data #get the weights for comparison
         
         return 0
@@ -187,23 +230,28 @@ class Regression(nn.Module):
             #print(lab)
             preds = self(feat).unsqueeze(-1) #find the accuracy on a certain give dataset
             pr = torch.where(preds>0.5, 1, 0)
+            #print(preds.reshape(len(lab))-lab.reshape(len(lab)))
             
             if FUNC == "lin": acc_agg += self.acc_calc(preds, lab)
             else: acc_agg += (pr.reshape(len(lab))==lab.squeeze(-1)).sum()
-            #print(loss)
-            loss += float(self.loss_fn(preds.reshape(len(lab)).to(torch.float32), lab.reshape(len(lab)).to(torch.float32)))
+            
+            loss += torch.linalg.norm(preds.reshape(len(lab))- lab.reshape(len(lab)))**2
             count+=len(feat)
             
+        #print(loss/count)
+        #print(loss)
         if FUNC == "log": return acc_agg/count, loss/count   
-        else: return acc_agg/count, loss/count   
-
+        else: return acc_agg/count, loss
+        
 all_data  = LRDataset(torch.cat(features, dim  = 0), torch.cat(labels, dim = 0))
 all_data = DataLoader(all_data, shuffle = True, batch_size= 50)
 
 model_star = Regression()
-model_star.fit(all_data, all_data= True)
-W_star = model_star.coef_.to(device)
+# model_star.fit(all_data, all_data= False)
+# W_star = model_star.coef_.to(device)
+
 W_star = w_star
+
 simils = torch.zeros(NUM_TASKS, NUM_TASKS)
 coefs = torch.zeros(factorial(NUM_TASKS), DIM)
 
@@ -235,30 +283,43 @@ for ind, dataset in enumerate(dataloaders):
     model = Regression().to(device)
     permutation = list(permute(range(NUM_TASKS)))[ind]
     distance = 0
-    init_time = time.time()
+    init_time = time.process_time()
     c = -1
-
+    
     for task_ind in range(NUM_TASKS):
         if task_ind>0: 
             distance+=abs(permutation[task_ind]*INC-permutation[task_ind-1]*INC)
             c = model.coef_.detach().clone()
             
-            c = c.squeeze(0)
-            W_star = W_star.squeeze(0)
+            c = c.flatten()
+            W_star = W_star.flatten()
             w_distances[ind][task_ind-1] = get_distances(c, W_star)
             wi = span_ws[task_ind-1].to(device)
+            #print(features[0]@(c-W_star).unsqueeze(-1))
             
-            wi = wi - torch.dot(wi, W_star)/torch.dot(W_star, W_star) * W_star
-            lambda1 = (torch.dot(c, W_star)/torch.dot(c, W_star))
+            #wi = wi - (torch.dot(wi, W_star)/torch.dot(W_star, W_star)) * W_star
+            
+            lambda1 = (torch.dot(c, W_star)/torch.dot(W_star, W_star))
+            
             # if lambda1>0:
-            #     print(torch.Tensor(c - (torch.dot(c, wi)/torch.dot(wi, wi))*wi - lambda1*W_star))
+            #     print(torch.linalg.norm(torch.Tensor(c - (torch.dot(c, wi)/torch.dot(wi, wi))*wi - lambda1*W_star)))
+                
             # else: print(torch.Tensor(c - (torch.dot(c, wi)/torch.dot(wi, wi))*wi))
-            
+          
         model.fit(dataset[task_ind])
-        losses[ind][task_ind] = torch.Tensor((g:=get_accuracies(model, dataloaders[0]))[1])
+        c = model.coef_.flatten() 
         
+        #print(m(next(iter(dataset[task_ind]))[0])-next(iter(dataset[task_ind]))[1])
+        #print(ang_bet(torch.Tensor(scipy.linalg.null_space(features[task_ind])).flatten(),c - (torch.dot(c, W_star)/torch.dot(W_star, W_star))*W_star))
+        losses[ind][task_ind] = torch.Tensor((g:=get_accuracies(model, dataloaders[0]))[1])
+        #print(g[1])
+        #print(torch.dot((model.coef_.flatten()-W_star),span_ws[task_ind])/(torch.linalg.norm(model.coef_.flatten()-W_star)*torch.linalg.norm(span_ws[permutation[task_ind]])))
+        
+        # print(torch.dot(span_ws[task_ind], (c-torch.dot(c, W_star)/torch.dot(W_star, W_star)*W_star))/(torch.linalg.norm(span_ws[task_ind])*torch.linalg.norm(c-torch.dot(c, W_star)/torch.dot(W_star, W_star)*W_star)))
+        # print(torch.dot(W_star, (c-(torch.dot(c, W_star)/torch.dot(W_star, W_star))*W_star)))
+        # print(torch.dot(W_star, span_ws[task_ind]))
         # if task_ind>0:
-        #     print(torch.dot((model.coef_-c).reshape(501), c.reshape(501)))
+        #     print(torch.dot((model.coef_.flatten()-c), c.reshape(101))/(torch.linalg.norm(model.coef_.flatten()-c)*torch.linalg.norm(c)))
     losses[ind][-1] = torch.Tensor(permutation)        
     
     
@@ -270,8 +331,9 @@ for ind, dataset in enumerate(dataloaders):
     acc, loss = get_accuracies(model, dataset)
     print(f"Accuracies:\t\t {(acc)}")
     print(f"Avg. accuracy:\t\t {(a:=float(sum(acc)/NUM_TASKS))}")
-    print(f"Time taken:\t\t {time.time()-init_time}\n\n")
+    print(f"Time taken:\t\t {time.process_time()-init_time}\n\n")
     results[ind] = torch.Tensor([dx, dn, a, permutation[-1]])
+    
 torch.save(results, f"lgrgresults/res{SEED}30.pt")
 torch.save(coefs, f"lgrgresults/coefs{SEED}30.pt")
 torch.save(w_distances, f"lgrgresults/w_distances{SEED}30.pt")
