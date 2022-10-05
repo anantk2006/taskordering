@@ -7,21 +7,20 @@ from itertools import permutations as permute
 import time
 from math import factorial, sqrt
 import random, numpy
-import sympy
 import sys; args = sys.argv[1:]
 
 #sys.stdout = open("logregv5out.txt", "w")
 
 DIM = 501
 NUM_TASKS = 5
-INC = 1/18* pi
+INC = 1/8* pi
 DSIZE = 500
 GPU = 3
 SEED = int(args[0])+10
 FUNC = "log"
 CYCLES = 1
 ZEROS = 4
-lr = 0.5 if FUNC == "lin" else 3
+lr = 0.5 if FUNC == "lin" else 0.5
 device = torch.device(f"cuda:{GPU}" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(SEED)
 random.seed(SEED)
@@ -91,9 +90,9 @@ for ind, w in enumerate(span_ws):
         e_sum = 0
         for i in range(DSIZE):
             
-            #nums = set(range(i+1, DIM))
+            nums = set(range(i+1, DIM))
             #nums = {random.randint(i+1, DIM-1)}
-            nums = {DIM -1}
+            #nums = {DIM -1}
             X[i][i] = random.random()+1
             while len(nums)>1:
                 n = nums.pop()
@@ -132,7 +131,7 @@ for ind, w in enumerate(span_ws):
         # #print(e_sum/(DIM*DSIZE))
         x = torch.from_numpy(scipy.linalg.null_space(X))
         print(x.shape)
-        if numpy.linalg.matrix_rank(X)==DSIZE:
+        if numpy.linalg.matrix_rank(X)==DSIZE or True:
             features.append(X)
             break
         ##print(X)
@@ -208,7 +207,7 @@ class Regression(nn.Module):
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optim, lambda epoch: lr/sqrt(epoch+1))
         t = time.time()
         
-        while ((p:=self.test(dataset)[1])>0.01) if FUNC == "lin" else ((p:=self.test(dataset))[1]>0.005 and p[0]<1) if not all_data else time.time()-t<10:
+        while ((p:=self.test(dataset)[1])>0.01) if FUNC == "lin" else ((p:=self.test(dataset))[1]>0.005 and p[0]<1) if not all_data else time.time()-t<20:
             
             for features, labels in dataset:   
                 #if torch.abs(features).max()>: raise Exception("Features too large")             
@@ -236,7 +235,7 @@ class Regression(nn.Module):
                 self.optim.step()
              
             self.scheduler.step()
-            if time.time()-t>=10: break
+            #if time.time()-t>=10: break
         self.coef_ = self.linear.weight.data #get the weights for comparison
         
         return 0
@@ -274,10 +273,10 @@ all_data  = LRDataset(torch.cat(features, dim  = 0), torch.cat(labels, dim = 0))
 all_data = DataLoader(all_data, shuffle = True, batch_size= 50)
 
 model_star = Regression()
-# model_star.fit(all_data, all_data= False)
-# W_star = model_star.coef_.to(device)
+model_star.fit(all_data, all_data= True)
+W_star = model_star.coef_.to(device).flatten()
 
-W_star = w_star
+#W_star = w_star
 
 simils = torch.zeros(NUM_TASKS, NUM_TASKS)
 coefs = torch.zeros(factorial(NUM_TASKS), DIM)
@@ -333,7 +332,7 @@ for ind, dataset in enumerate(dataloaders):
                 
             # else: print(torch.Tensor(c - (torch.dot(c, wi)/torch.dot(wi, wi))*wi))
           
-        model.fit(dataset[task_ind], all_data=True)
+        model.fit(dataset[task_ind])
         
         #print(torch.where(model(features[task_ind])>0.5, 1, 0).flatten() - torch.where(features[task_ind]@W_star>0, 1, 0).flatten())
         # v = model.coef_.flatten()
@@ -342,7 +341,7 @@ for ind, dataset in enumerate(dataloaders):
         #print(features[task_ind])
         
         ##print(m(next(iter(dataset[task_ind]))[0])-next(iter(dataset[task_ind]))[1])
-        print(ang_bet(torch.Tensor(scipy.linalg.null_space(features[task_ind])).flatten(),c - (torch.dot(c, W_star)/torch.dot(W_star, W_star))*W_star))
+        #print(ang_bet(torch.Tensor(scipy.linalg.null_space(features[task_ind])).flatten(),c - (torch.dot(c, W_star)/torch.dot(W_star, W_star))*W_star))
         # print(torch.Tensor(scipy.linalg.null_space(features[task_ind])).shape)
         #print((features[task_ind]@(c - (torch.dot(c, W_star)/torch.dot(W_star, W_star))*W_star).reshape(DIM, 1))/(features[task_ind]@W_star))
         # print(((features[task_ind]@(c).reshape(DIM, 1))/(features[task_ind]@(W_star).reshape(-1, 1))).min())
