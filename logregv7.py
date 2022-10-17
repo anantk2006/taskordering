@@ -20,7 +20,7 @@ SEED = int(args[0])+10
 FUNC = "log"
 CYCLES = 1
 ZEROS = 4
-lr = 0.5 if FUNC == "lin" else 0.5
+lr = 0.5 if FUNC == "lin" else 0.2
 samps = 250
 device = torch.device(f"cuda:{GPU}" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(SEED)
@@ -52,6 +52,7 @@ span_ws = torch.zeros(NUM_TASKS, DIM)
 span_ws[0] = get_matrix(DIM)@torch.Tensor([1]+[0]*(DIM-1))
 for i in range(NUM_TASKS-1):
     span_ws[i+1] = get_matrix(DIM)@span_ws[i] 
+    #print(ang_bet(span_ws[i+1], span_ws[i]))
 
 # endings = []
 # for k in [-1, 0, 1]:
@@ -86,7 +87,7 @@ for i in range(NUM_TASKS-1):
 
 features = []
 i = 0
-error = 0.25
+error = 0.1
 for ind, w in enumerate(span_ws):
     prev = len(features)
     for s in range(3):
@@ -94,12 +95,14 @@ for ind, w in enumerate(span_ws):
         e_sum = 0
         for i in range(DSIZE):
             
-            nums = set(range(i+1, DIM))
+            nums = list(range(i+1, DIM))
             #nums = {random.randint(i+1, DIM-1)}
             #nums = {DIM -1}
             X[i][i] = 1
             while len(nums)>1:
-                n = nums.pop()
+                n = random.choice(nums)
+                nums.remove(n)
+                
                 c_sum = torch.dot(X[i], w)
                 
                 
@@ -118,10 +121,17 @@ for ind, w in enumerate(span_ws):
                 
                 
             n = nums.pop()
+            
             X[i][n] = -torch.dot(X[i], w)/w[n]
+            # print(X[i])
+            # print(X[i][n])
         while True:
             try:
-                X = get_matrix(DSIZE)@X
+                O = get_matrix(DSIZE)
+                for i in range(DIM):
+                    X[:, i] *= i**(2/3)
+                X = O*X
+                print("y")
                 break
             except: 
                 fgdh = 0
@@ -147,7 +157,7 @@ for ind, w in enumerate(span_ws):
         #         #print(ang_bet(i, j))
                 ##print("x", ang_bet(w, j))
         
-
+print("x")
 
 
 
@@ -160,7 +170,7 @@ def ortho(w_star, ws):
         w_star = w_star - torch.dot(w_star, w)/(torch.dot(w,w))*w
     return w_star
 while True:
-    w_star = ortho(torch.rand(DIM)*2-1, span_ws)
+    w_star = torch.rand(DIM)*2-1
     if FUNC == "log": labels = [torch.where((X @ w_star.unsqueeze(-1))>0, 1, 0) for X in features]
     else: labels = [X @ w_star.unsqueeze(-1) for X in features]
 
@@ -219,15 +229,16 @@ class Regression(nn.Module):
                 preds = self(features).unsqueeze(-1) #iterate through dataloader
                 loss = self.loss_fn(preds.flatten(), labels.flatten().to(torch.float32)) #calculate loss
                 
-                # if time.time()-t>60:
-                    
-                #     with open("debug_loss.txt", "a+") as f:                    
-                #         if round(loss.item(),6)%1 == 0:
-                #             f.write(str(loss.item())+"\n")
-                #             f.write("f"+str(features)+"\n")
-                #             f.write("w"+str(self.linear.weight.data)+"\n")
-                #             f.write(str(torch.mm(features, self.linear.weight.data.reshape(DIM, 1)))+"\n")
-                #             f.write(str(p) + "\n")
+                if time.time()-t>60:
+                    if time.time()-t>62:
+                        exit()
+                    with open("debug_loss.txt", "a+") as f:                    
+                        if round(loss.item(),6)%1 == 0:
+                            f.write(str(loss.item())+"\n")
+                            f.write("f"+str(features)+"\n")
+                            f.write("w"+str(self.linear.weight.data)+"\n")
+                            f.write(str(torch.mm(features, self.linear.weight.data.reshape(DIM, 1)))+"\n")
+                            f.write(str(p) + "\n")
                 
                 loss.backward()
                 ##print(torch.linalg.norm(self.linear.weight.grad))
@@ -276,9 +287,9 @@ class Regression(nn.Module):
 all_data  = LRDataset(torch.cat(features, dim  = 0), torch.cat(labels, dim = 0))
 all_data = DataLoader(all_data, shuffle = True, batch_size= 50)
 
-model_star = Regression()
-model_star.fit(all_data, all_data= True)
-W_star = model_star.coef_.to(device).flatten()
+#model_star = Regression()
+#model_star.fit(all_data, all_data= True)
+#W_star = model_star.coef_.to(device).flatten()
 
 W_star = w_star
 
