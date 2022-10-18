@@ -13,7 +13,7 @@ import sys; args = sys.argv[1:]
 
 DIM = 501
 NUM_TASKS = 5
-INC = 1/8* pi
+INC = 1/18* pi
 DSIZE = 500
 GPU = 3
 SEED = int(args[0])+10
@@ -90,12 +90,13 @@ for ind, w in enumerate(span_ws):
         e_sum = 0
         for i in range(DSIZE):
             
-            nums = set(range(i+1, DIM))
+            nums = list(range(i+1, DIM))
             #nums = {random.randint(i+1, DIM-1)}
             #nums = {DIM -1}
-            X[i][i] = random.random()+1
+            X[i][i] = 1
             while len(nums)>1:
-                n = nums.pop()
+                n = random.choice(nums)
+                nums.remove(n)
                 c_sum = torch.dot(X[i], w)
                 
                 
@@ -114,6 +115,7 @@ for ind, w in enumerate(span_ws):
                 
                 
             n = nums.pop()
+            
             X[i][n] = -torch.dot(X[i], w)/w[n]
         while True:
             try:
@@ -130,7 +132,7 @@ for ind, w in enumerate(span_ws):
         
         # #print(e_sum/(DIM*DSIZE))
         x = torch.from_numpy(scipy.linalg.null_space(X))
-        print(x.shape)
+        
         if numpy.linalg.matrix_rank(X)==DSIZE or True:
             features.append(X)
             break
