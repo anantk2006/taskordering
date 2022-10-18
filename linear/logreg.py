@@ -26,12 +26,11 @@ device = torch.device(f"cuda:{GPU}" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(SEED)
 random.seed(SEED)
 numpy.random.seed(SEED)
-
 ang_bet  = lambda a, b: torch.dot(a,b)/(torch.linalg.norm(b)*torch.linalg.norm(a))
 proj = lambda a, b: (torch.dot(a, b)/torch.dot(b, b))*b
 
 
-def get_matrix(N):    
+def get_matrix(N):
     while True :
         Phi = numpy.random.randn(N, N).astype(numpy.float32)
         g = orth(Phi)
@@ -42,7 +41,7 @@ def get_matrix(N):
 def rot(w):
     while True:
         M = get_matrix(w.shape[0])
-        return (M @ w) 
+        return (M @ w)
 
 span_ws = torch.zeros(NUM_TASKS, DIM)
 span_ws[0] = get_matrix(DIM)@torch.Tensor([1]+[0]*(DIM-1))
@@ -83,16 +82,11 @@ for ind, w in enumerate(span_ws):
             X[i][n] = random.random()*(errors[0]-errors[1])+errors[1]
             
 
-            
-            
-       
         X[i][n] = -torch.dot(X[i], w)/w[n]
-           
 
     O = get_matrix(DSIZE)
     X = O@X
     features.append(X)
-            
 
 def ortho(W_star, ws):
     for w in orth(ws.T).T:
@@ -109,7 +103,6 @@ while True:
     for label in labels:
         if label.sum()>DSIZE//3 or label.sum()<DSIZE/1.5: continue
     break
-
 
 
 
