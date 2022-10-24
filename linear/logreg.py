@@ -1,3 +1,4 @@
+
 import torch
 from torch import nn
 from math import sin, cos, pi
@@ -8,11 +9,10 @@ import time
 from math import factorial, sqrt
 import random, numpy
 from scipy.linalg import orth
-import scipy
 import sys; args = sys.argv[1:]
 
 DIM = 501
-NUM_TASKS = 8
+NUM_TASKS = 5
 INC = 1/18* pi
 DSIZE = 500
 GPU = 3
@@ -20,8 +20,8 @@ SEED = int(args[0])+10
 FUNC = "log"
 CYCLES = 1
 ZEROS = 4
-lr = 0.5 if FUNC == "lin" else 0.2
-samps = 250
+lr = 0.5 if FUNC == "lin" else 0.1
+samps = 0
 device = torch.device(f"cuda:{GPU}" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(SEED)
 random.seed(SEED)
@@ -43,16 +43,21 @@ def rot(w):
         M = get_matrix(w.shape[0])
         return (M @ w)
 
-span_ws = torch.zeros(NUM_TASKS, DIM)
-span_ws[0] = get_matrix(DIM)@torch.Tensor([1]+[0]*(DIM-1))
-for i in range(NUM_TASKS-1):
-    span_ws[i+1] = get_matrix(DIM)@span_ws[i] 
-    
+if samps == 0:
+    span_ws = torch.Tensor([[0]*(DIM-2)+[sin((x+2.5)*INC), cos((x+2.5)*INC)] for x in range(NUM_TASKS)])
+    span_ws = rot(span_ws.T).T
+else:
+
+    span_ws = torch.zeros(NUM_TASKS, DIM)
+    span_ws[0] = get_matrix(DIM)@torch.Tensor([1]+[0]*(DIM-1))
+    for i in range(NUM_TASKS-1):
+        span_ws[i+1] = get_matrix(DIM)@span_ws[i] 
+
 
 
 features = []
 i = 0
-error = 0.1
+error = 0.25
 for ind, w in enumerate(span_ws):
     prev = len(features)
    
@@ -80,12 +85,24 @@ for ind, w in enumerate(span_ws):
                 errors[0] = 3*(errors[0]/abs(errors[0]))
             
             X[i][n] = random.random()*(errors[0]-errors[1])+errors[1]
-            
-
-        X[i][n] = -torch.dot(X[i], w)/w[n]
+        nums = [nums.pop()]+list(set(range(DIM)))  
+        while True:  
+            n = nums.pop()
+            last = -(torch.dot(X[i], w)-X[i][n]*w[n])/w[n]
+            if abs(last)<5: 
+                X[i][n] = last
+                break
+        
 
     O = get_matrix(DSIZE)
+    
+    
+    for i in range(DSIZE):
+        O[:, i] = (O[:, i]/torch.linalg.norm(O[:, i]))*((DIM-i)**0.3)
     X = O@X
+
+    
+    
     features.append(X)
 
 def ortho(W_star, ws):
@@ -94,7 +111,7 @@ def ortho(W_star, ws):
         W_star = W_star - torch.dot(W_star, w)/(torch.dot(w,w))*w
     return W_star
 while True:
-    W_star = torch.rand(DIM)*2-1
+    W_star = ortho(torch.rand(DIM)*2-1, span_ws)
     if FUNC == "log": labels = [torch.where((X @ W_star.unsqueeze(-1))>0, 1, 0) for X in features]
     else: labels = [X @ W_star.unsqueeze(-1) for X in features]
 
@@ -227,13 +244,13 @@ def get_distances(w, w_s):
 
 
 dataloaders = list(permute(dataloaders, NUM_TASKS))
-results = torch.zeros(samps, 4)
-w_distances = torch.zeros(samps, NUM_TASKS)
+results = torch.zeros(samps if samps!=0 else factorial(NUM_TASKS), 4)
+w_distances = torch.zeros(samps if samps!=0 else factorial(NUM_TASKS), NUM_TASKS)
 
 W_star = W_star.to(device)
 
-losses = torch.zeros(samps, NUM_TASKS+1, NUM_TASKS) 
-for s, ind in enumerate(torch.randint(0, factorial(NUM_TASKS), (250,))):
+losses = torch.zeros(samps if samps!=0 else factorial(NUM_TASKS), NUM_TASKS+1, NUM_TASKS) 
+for s, ind in enumerate(torch.randint(0, factorial(NUM_TASKS), (samps,)) if samps != 0 else range(factorial(NUM_TASKS))):
     dataset = dataloaders[ind]
     model = Regression().to(device)
     permutation = list(permute(range(NUM_TASKS)))[ind]
@@ -280,12 +297,13 @@ for s, ind in enumerate(torch.randint(0, factorial(NUM_TASKS), (250,))):
     print(f"Avg. accuracy:\t\t {(a:=float(sum(acc)/NUM_TASKS))}")
     print(f"Time taken:\t\t {time.process_time()-init_time}\n\n")
     results[s] = torch.Tensor([dx, dn, a, permutation[-1]])
+    print(s)
     
-torch.save(results, f"lgrgresults/res{SEED}30.pt")
-torch.save(coefs, f"lgrgresults/coefs{SEED}30.pt")
-torch.save(w_distances, f"lgrgresults/w_distances{SEED}30.pt")
-torch.save(losses, f"lgrgresults/losses{SEED}30.pt")
-torch.save(span_ws, f"lgrgresults/span_ws{SEED}30.pt")
+torch.save(results, f"../lgrgresults/res{SEED}30.pt")
+torch.save(coefs, f"../lgrgresults/coefs{SEED}30.pt")
+torch.save(w_distances, f"../lgrgresults/w_distances{SEED}30.pt")
+torch.save(losses, f"../lgrgresults/losses{SEED}30.pt")
+torch.save(span_ws, f"../lgrgresults/span_ws{SEED}30.pt")
 
 
         
