@@ -20,7 +20,7 @@ SEED = int(args[0])+10
 FUNC = "log"
 CYCLES = 1
 ZEROS = 4
-lr = 0.5 if FUNC == "lin" else 0.1
+lr = 0.5 if FUNC == "lin" else 0.5
 samps = 0
 device = torch.device(f"cuda:{GPU}" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(SEED)
@@ -29,7 +29,7 @@ numpy.random.seed(SEED)
 ang_bet  = lambda a, b: torch.dot(a,b)/(torch.linalg.norm(b)*torch.linalg.norm(a))
 proj = lambda a, b: (torch.dot(a, b)/torch.dot(b, b))*b
 
-datagen = "general" # Choices: ["general", "good"]
+datagen = "good" # Choices: ["general", "good"]
 
 
 def get_matrix(N):
@@ -137,7 +137,8 @@ for ind, w in enumerate(span_ws):
         raise NotImplementedError
 
     features.append(X)
-
+    print(ind)
+#print(features[0])
 def ortho(W_star, ws):
     for w in orth(ws.T).T:
         w = torch.Tensor(w)
@@ -182,7 +183,7 @@ class Regression(nn.Module):
         
         def init_weights(m):
             if type(m) == nn.Linear:
-                torch.nn.init.constant_(m.weight, 0)
+                torch.nn.init.constant_(m.weight, 0.001)
         
         self.net.apply(init_weights)
 
@@ -204,6 +205,7 @@ class Regression(nn.Module):
                 
                 if time.time()-t>60:
                     if time.time()-t>62:
+                        print("x")
                         exit()
                     with open("debug_loss.txt", "a+") as f:                    
                         if round(loss.item(),6)%1 == 0:
@@ -219,7 +221,7 @@ class Regression(nn.Module):
             self.scheduler.step()
 
         self.coef_ = self.linear.weight.data #get the weights for comparison
-        
+        #print(self.coef_)
         return 0
 
     def forward(self, features):
@@ -253,12 +255,12 @@ class Regression(nn.Module):
         else: return acc_agg/count, loss
         
 # If using "good" data generation, recompute W_star.
-if datagen == "good":
-    all_data = LRDataset(torch.cat(features, dim  = 0), torch.cat(labels, dim = 0))
-    all_data = DataLoader(all_data, shuffle = True, batch_size= 50)
-    model_star = Regression()
-    model_star.fit(all_data, all_data= True)
-    W_star = model_star.coef_.to(device).flatten()
+# if datagen == "good":
+#     a = LRDataset(torch.cat(features, dim  = 0), torch.cat(labels, dim = 0))
+#     a = DataLoader(a, shuffle = True, batch_size= 50)
+#     model_star = Regression()
+#     model_star.fit(a)
+#     W_star = model_star.coef_.to(device).flatten()
 
 
 simils = torch.zeros(NUM_TASKS, NUM_TASKS)
@@ -287,6 +289,7 @@ W_star = W_star.to(device)
 
 losses = torch.zeros(samps if samps!=0 else factorial(NUM_TASKS), NUM_TASKS+1, NUM_TASKS) 
 for s, ind in enumerate(torch.randint(0, factorial(NUM_TASKS), (samps,)) if samps != 0 else range(factorial(NUM_TASKS))):
+    print(s, ind)
     dataset = dataloaders[ind]
     model = Regression().to(device)
     permutation = list(permute(range(NUM_TASKS)))[ind]
