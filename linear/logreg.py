@@ -1,4 +1,3 @@
-
 import torch
 from torch import nn
 from math import sin, cos, pi
@@ -8,6 +7,7 @@ from itertools import permutations as permute
 import time
 from math import factorial, sqrt
 import random, numpy
+import scipy
 from scipy.linalg import orth
 import sys; args = sys.argv[1:]
 
@@ -29,6 +29,8 @@ numpy.random.seed(SEED)
 ang_bet  = lambda a, b: torch.dot(a,b)/(torch.linalg.norm(b)*torch.linalg.norm(a))
 proj = lambda a, b: (torch.dot(a, b)/torch.dot(b, b))*b
 
+datagen = "general" # Choices: ["general", "good"]
+
 
 def get_matrix(N):
     while True :
@@ -43,34 +45,53 @@ def rot(w):
         M = get_matrix(w.shape[0])
         return (M @ w)
 
-if samps == 0:
-    span_ws = torch.Tensor([[0]*(DIM-2)+[sin((x+2.5)*INC), cos((x+2.5)*INC)] for x in range(NUM_TASKS)])
+# Data generation.
+if datagen == "general":
+    if samps == 0:
+        span_ws = torch.Tensor([[0]*(DIM-2)+[sin((x+2.5)*INC), cos((x+2.5)*INC)] for x in range(NUM_TASKS)])
+        span_ws = rot(span_ws.T).T
+    else:
+        span_ws = torch.zeros(NUM_TASKS, DIM)
+        span_ws[0] = get_matrix(DIM)@torch.Tensor([1]+[0]*(DIM-1))
+        for i in range(NUM_TASKS-1):
+            span_ws[i+1] = get_matrix(DIM)@span_ws[i] 
+elif datagen == "good":
+    span_ws = torch.Tensor([[0]*(DIM-2)+[sin((x+2.5)*INC) if abs(sin((x+2.5)*INC))>0.01 else 0, cos((x+2.5)*INC) if cos((x+2.5)*INC)>0.01 else 0] for x in range(NUM_TASKS)])
     span_ws = rot(span_ws.T).T
+
 else:
-
-    span_ws = torch.zeros(NUM_TASKS, DIM)
-    span_ws[0] = get_matrix(DIM)@torch.Tensor([1]+[0]*(DIM-1))
-    for i in range(NUM_TASKS-1):
-        span_ws[i+1] = get_matrix(DIM)@span_ws[i] 
-
-
+    raise NotImplementedError
 
 features = []
 i = 0
 error = 0.25
 for ind, w in enumerate(span_ws):
     prev = len(features)
-   
+
     X = torch.zeros((DSIZE, DIM))
     e_sum = 0
     for i in range(DSIZE):
         
-        nums = list(range(i+1, DIM))
-        
-        X[i][i] = 1
+        if datagen == "general":
+            nums = list(range(i+1, DIM))
+            X[i][i] = 1
+        elif datagen == "good":
+            nums = set(range(i+1, DIM))
+            #nums = {random.randint(i+1, DIM-1)}
+            #nums = {DIM -1}
+            X[i][i] = random.random()+1
+        else:
+            raise NotImplementedError
+
         while len(nums)>1:
-            n = random.choice(nums)
-            nums.remove(n)
+
+            if datagen == "general":
+                n = random.choice(nums)
+                nums.remove(n)
+            elif datagen == "good":
+                n = nums.pop()
+            else:
+                raise NotImplementedError
             
             c_sum = torch.dot(X[i], w)
             
@@ -85,24 +106,36 @@ for ind, w in enumerate(span_ws):
                 errors[0] = 3*(errors[0]/abs(errors[0]))
             
             X[i][n] = random.random()*(errors[0]-errors[1])+errors[1]
-        nums = [nums.pop()]+list(set(range(DIM)))  
-        while True:  
+
+        if datagen == "general":
+            nums = [nums.pop()]+list(set(range(DIM)))  
+            while True:  
+                n = nums.pop()
+                last = -(torch.dot(X[i], w)-X[i][n]*w[n])/w[n]
+                if abs(last)<5: 
+                    X[i][n] = last
+                    break
+        elif datagen == "good":
             n = nums.pop()
-            last = -(torch.dot(X[i], w)-X[i][n]*w[n])/w[n]
-            if abs(last)<5: 
-                X[i][n] = last
+            X[i][n] = -torch.dot(X[i], w)/w[n]
+        else:
+            raise NotImplementedError
+
+    if datagen == "general":
+        O = get_matrix(DSIZE)
+        for i in range(DSIZE):
+            O[:, i] = (O[:, i]/torch.linalg.norm(O[:, i]))*((DIM-i)**0.3)
+        X = O@X
+    elif datagen == "good":
+        while True:
+            try:
+                X = get_matrix(DSIZE)@X
                 break
-        
+            except: 
+                fgdh = 0
+    else:
+        raise NotImplementedError
 
-    O = get_matrix(DSIZE)
-    
-    
-    for i in range(DSIZE):
-        O[:, i] = (O[:, i]/torch.linalg.norm(O[:, i]))*((DIM-i)**0.3)
-    X = O@X
-
-    
-    
     features.append(X)
 
 def ortho(W_star, ws):
@@ -110,6 +143,7 @@ def ortho(W_star, ws):
         w = torch.Tensor(w)
         W_star = W_star - torch.dot(W_star, w)/(torch.dot(w,w))*w
     return W_star
+
 while True:
     W_star = ortho(torch.rand(DIM)*2-1, span_ws)
     if FUNC == "log": labels = [torch.where((X @ W_star.unsqueeze(-1))>0, 1, 0) for X in features]
@@ -164,7 +198,6 @@ class Regression(nn.Module):
         while ((p:=self.test(dataset)[1])>0.01) if FUNC == "lin" else (self.test(dataset)[0]<1):
             
             for features, labels in dataset:   
-             
                 self.optim.zero_grad()
                 preds = self(features).unsqueeze(-1) #predict using model
                 loss = self.loss_fn(preds.flatten(), labels.flatten().to(torch.float32)) 
@@ -184,7 +217,7 @@ class Regression(nn.Module):
                 self.optim.step() # backpropagation
              
             self.scheduler.step()
-           
+
         self.coef_ = self.linear.weight.data #get the weights for comparison
         
         return 0
@@ -194,7 +227,7 @@ class Regression(nn.Module):
 
     def acc_calc(self, preds, labels):
         diffs = abs(preds-labels)
-        g = torch.where(diffs<1, 1, 0) 
+        g = torch.where(diffs<1, 1, 0)
         return g.sum().item()
 
     def test(self, dataset):
@@ -216,12 +249,16 @@ class Regression(nn.Module):
             loss += torch.linalg.norm(preds.reshape(len(lab))- lab.reshape(len(lab)))**2
             count+=len(feat)
             
-       
         if FUNC == "log": return acc_agg/count, loss/count   
         else: return acc_agg/count, loss
         
-
-
+# If using "good" data generation, recompute W_star.
+if datagen == "good":
+    all_data = LRDataset(torch.cat(features, dim  = 0), torch.cat(labels, dim = 0))
+    all_data = DataLoader(all_data, shuffle = True, batch_size= 50)
+    model_star = Regression()
+    model_star.fit(all_data, all_data= True)
+    W_star = model_star.coef_.to(device).flatten()
 
 
 simils = torch.zeros(NUM_TASKS, NUM_TASKS)
@@ -246,7 +283,6 @@ def get_distances(w, w_s):
 dataloaders = list(permute(dataloaders, NUM_TASKS))
 results = torch.zeros(samps if samps!=0 else factorial(NUM_TASKS), 4)
 w_distances = torch.zeros(samps if samps!=0 else factorial(NUM_TASKS), NUM_TASKS)
-
 W_star = W_star.to(device)
 
 losses = torch.zeros(samps if samps!=0 else factorial(NUM_TASKS), NUM_TASKS+1, NUM_TASKS) 
@@ -265,17 +301,13 @@ for s, ind in enumerate(torch.randint(0, factorial(NUM_TASKS), (samps,)) if samp
             c = model.coef_.detach().clone()
             
             c = c.flatten()
-            W_star = W_star.flatten() 
+            W_star = W_star.flatten()
             w_distances[s][task_ind-1] = get_distances(c, W_star)
             wi = span_ws[task_ind-1].to(device)
-           
             lambda1 = (torch.dot(c, W_star)/torch.dot(W_star, W_star))
             
-           
-          
         model.fit(dataset[task_ind])
         
-
         c = model.coef_.flatten() 
 
         losses[s][task_ind] = torch.Tensor((g:=get_accuracies(model, dataloaders[0]))[1])
@@ -304,9 +336,3 @@ torch.save(coefs, f"../lgrgresults/coefs{SEED}30.pt")
 torch.save(w_distances, f"../lgrgresults/w_distances{SEED}30.pt")
 torch.save(losses, f"../lgrgresults/losses{SEED}30.pt")
 torch.save(span_ws, f"../lgrgresults/span_ws{SEED}30.pt")
-
-
-        
-
-
-
