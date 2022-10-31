@@ -20,7 +20,8 @@ SEED = int(args[0])+10
 FUNC = "log"
 CYCLES = 1
 ZEROS = 4
-lr = 0.5 if FUNC == "lin" else 0.5
+datagen = "general" # Choices: ["general", "good"]
+lr = 0.5 if FUNC == "lin" else 0.1 if datagen=="general" else 0.5
 samps = 0
 device = torch.device(f"cuda:{GPU}" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(SEED)
@@ -29,7 +30,7 @@ numpy.random.seed(SEED)
 ang_bet  = lambda a, b: torch.dot(a,b)/(torch.linalg.norm(b)*torch.linalg.norm(a))
 proj = lambda a, b: (torch.dot(a, b)/torch.dot(b, b))*b
 
-datagen = "good" # Choices: ["general", "good"]
+
 
 
 def get_matrix(N):
@@ -64,7 +65,7 @@ else:
 
 features = []
 i = 0
-error = 0.25
+error = 0.05
 for ind, w in enumerate(span_ws):
     prev = len(features)
 
