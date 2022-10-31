@@ -1,0 +1,44 @@
+Instructions:
+- Fill in the skeleton I provided in main.py by partitioning your code from logreg.py
+  into the functions I specified in the skeleton.
+- If you want other functions that the ones I've provided (and you will), put them in
+  other files and import them in main.py. Do not just dump them all into a single other
+  file, then you've just moved the clutter somewhere else. Organize them into different
+  files based on their functionality. It is okay to have a utils.py to hold a small
+  number of small, miscellaneous functions that don't fit well into other categories.
+  Just don't shove too much stuff there.
+- Keep going until the code runs exactly as before under the new skeleton.
+
+Some guidelines to follow:
+- A benchmark you can set for the organization is to make it so that a new person
+  reading a block of code will understand how it works (micro) and fits into the larger
+  program (macro). If you can achieve that, then the code is organized enough to easily
+  debug, maintain, and modify.
+- Don't just cut and paste huge chunks of code into the empty skeleton functions. If you
+  put code into a function, make sure that the code is relevant and necessary for the
+  part of the program described by the function name. We want to eliminate the
+  "spaghetti" quality of your current code, where all of the functionality is spread
+  throughout the program. Instead, what we want is for each function to have a specific
+  purpose with a simple, readable implementation.
+- WRITE COMMENTS TO EXPLAIN WHAT CODE DOES. Unless the purpose of a block of code is
+  immediately obvious upon reading it, there should be a comment explaining the block.
+  Just one sentence is fine. EVERY function should have a comment, and that comment
+  shouldn't just repeat the function name, e.g. "Return distances" is not a good comment
+  for get_distances(). The comment should give more information: distances of what? what
+  will the distances be used for?
+- Simplify code wherever possible. There are unnecessary while loops with immediate
+  breaks which can be converted into no-loop code, unnecessary try-excepts which don't
+  do anything, unused variables, etc. Just get rid of this unnecessary stuff every time
+  you come across it.
+- Try not to have any ridiculously long lines of code. It's more readable to break a
+  long line (longer than 88 characters) into multiple short ones.
+- Get rid of any "magic numbers". Example: The number 2.5 appears on lines 52 and 60 of
+  logreg.py, but what does it represent? That value should be stored in a variable to
+  create (1) readability (2) a single point of control over the multiple places where
+  that value appears.
+- Stop committing commented-out print statements. When you're done with this debug
+  stuff, just delete it. Otherwise it will grow and make the code more and more
+  cluttered. You can check whether any unwanted artifacts are still present before
+  committing with "git status".
+- Leave some white space between blocks of unrelated code. It will drastically improve
+  readability.
