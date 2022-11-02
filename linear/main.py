@@ -1,12 +1,16 @@
 import sys; args = sys.argv[1:]
+
+import time, random
+from itertools import permutations as permute
+from math import sin, cos, pi, factorial, sqrt
+
 import torch
 from torch.utils.data import DataLoader
-from dataset import LRDataset
-from math import sin, cos, pi, factorial, sqrt
-from itertools import permutations as permute
-import time, random, numpy
 from scipy import linalg
+import numpy
+
 from models import Regression
+from dataset import LRDataset
 
 
 NUM_TASKS = 5
@@ -27,11 +31,7 @@ ERROR = 0.05 #max ERROR that data row can stray from 0 to minimize last element
 BALANCE = 0.3 # counter balance exponent to balance out X from numerical stray resulting from triangularity
 DATA_ENTRY_MAX = 5
 
-device = torch.device(f"cuda:{GPU}" if torch.cuda.is_available() else "cpu")
-torch.manual_seed(SEED)
-random.seed(SEED)
-numpy.random.seed(SEED)
-ang_bet  = lambda a, b: torch.dot(a,b)/(torch.linalg.norm(b)*torch.linalg.norm(a))
+ang_bet  = lambda a, b: torch.dot(a,b)/(torch.linalg.norm(b)*torch.linalg.norm(a)) #angle similarity metrics 
 proj = lambda a, b: (torch.dot(a, b)/torch.dot(b, b))*b
 
 def generate_data():
@@ -127,24 +127,16 @@ def generate_data():
         if datagen == "general":
             O = get_matrix(DSIZE)
             for i in range(DSIZE):
-                O[:, i] = (O[:, i]/torch.linalg.norm(O[:, i]))*((DIM-i)**BALANCE)
+                O[:, i] = (O[:, i]/torch.linalg.norm(O[:, i]))*((DIM-i)**BALANCE) # balance out columns of matrix
             X = O@X
         elif datagen == "good":
-            while True:
-                try:
-                    X = get_matrix(DSIZE)@X
-                    break
-                except: 
-                    fgdh = 0
+            X = get_matrix(DSIZE)@X                  
         else:
             raise NotImplementedError
 
         features.append(X)
         print(f"Task Data {ind} created")
     return features, span_ws
-
-
- 
 
 
 def generate_solution_labels(features, span_ws):
@@ -168,10 +160,9 @@ def generate_solution_labels(features, span_ws):
     return W_star, labels
 
 
-def train(features, W_star, labels, dataloaders):
-    """ Run continual learning with a linear model. """      
+def train(W_star, dataloaders, device):
+    """ Run continual learning with a linear model. """  
 
-    
     def get_accuracies(model, datasets):
         ret_a = []; ret_l = []
         for dataset in datasets:
@@ -206,8 +197,7 @@ def train(features, W_star, labels, dataloaders):
             c = model.coef_.flatten() 
             losses[s][task_ind] = torch.Tensor((g:=get_accuracies(model, dataloaders[0]))[1])
 
-        losses[s][-1] = torch.Tensor(permutation)        
-        
+        losses[s][-1] = torch.Tensor(permutation)      
         
         acc, loss = get_accuracies(model, dataset)
         coefs[s] = model.coef_  
@@ -223,8 +213,13 @@ def train(features, W_star, labels, dataloaders):
         results[s] = torch.Tensor([dx, dn, a, permutation[-1]])
     return results, losses, w_distances, coefs
 
-def main():
+def main():    
     """ Main function for linear continual learning experiments. """
+
+    device = torch.device(f"cuda:{GPU}" if torch.cuda.is_available() else "cpu")
+    torch.manual_seed(SEED)
+    random.seed(SEED)
+    numpy.random.seed(SEED)
 
     # Set up training data.
     features, span_ws = generate_data()
@@ -238,12 +233,9 @@ def main():
     ]
 
     # Perform training and save results.
-    results, losses, w_distances, coefs = train(features, W_star, labels, dataloaders)
+    results = train(W_star, dataloaders, device)
     torch.save(results, f"../lgrgresults/results{SEED}.pt")
-    torch.save(losses, f"../lgrgresults/losses{SEED}.pt")
-    torch.save(w_distances, f"../lgrgresults/w_distances{SEED}.pt")
-    torch.save(coefs, f"../lgrgresults/coefs{SEED}.pt")
-
+    
 
 if __name__ == "__main__":
     main()
