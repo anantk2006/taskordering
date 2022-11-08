@@ -18,7 +18,7 @@ def test_labels(features, span_ws):
         if (torch.where(features[ind]@W_star.unsqueeze(-1)>0, 1, 0)-lab).sum()>0.01:            
             
             return False, labels, W_star
-        if lab.sum()>lab.numel()/1.5 or lab.sum()<lab.numel/3:
+        if lab.sum()>lab.numel()/1.5 or lab.sum()<lab.numel()/3:
             print(lab.sum())
             return False, labels, W_star
     return True, labels, W_star

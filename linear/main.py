@@ -20,16 +20,17 @@ DIM = 501
 samps = 0
 
 GPU = 3
-SEED = int(args[0])
 FUNC = "log"
-datagen = "general" # Choices: ["general", "good"]
+datagen = "good" # Choices: ["general", "good"]
 
 lr = 0.5 if FUNC == "lin" else 0.1 if datagen=="general" else 0.5
 BATCH_SIZE = 50
+RETRAIN = True
 
-ERROR = 0.05 #max ERROR that data row can stray from 0 to minimize last element
+
+ERROR = 0.1 #max ERROR that data row can stray from 0 to minimize last element
 BALANCE = 0.3 # counter balance exponent to balance out X from numerical stray resulting from triangularity
-DATA_ENTRY_MAX = 5
+DATA_ENTRY_MAX = 3 #max value of each data entry
 
 ang_bet  = lambda a, b: torch.dot(a,b)/(torch.linalg.norm(b)*torch.linalg.norm(a)) #angle similarity metrics 
 proj = lambda a, b: (torch.dot(a, b)/torch.dot(b, b))*b
@@ -82,6 +83,7 @@ def generate_data():
             elif datagen == "good":
                 nums = set(range(i+1, DIM)) #which numbers to fill in
                 X[i][i] = random.random()+1
+
             else:
                 raise NotImplementedError
 
@@ -135,6 +137,7 @@ def generate_data():
             raise NotImplementedError
 
         features.append(X)
+        print(X)
         print(f"Task Data {ind} created")
     return features, span_ws
 
@@ -154,9 +157,10 @@ def generate_solution_labels(features, span_ws):
 
         if FUNC == "lin": break
 
-        for label in labels: #ensure that percentage of 1s is between 1/3 and 2/3 - balance in labels
-            if label.sum()>DSIZE//3 or label.sum()<DSIZE/1.5: continue
-        break
+        for ind, label in enumerate(labels): #ensure that percentage of 1s is between 1/3 and 2/3 - balance in labels
+            if label.sum()>DSIZE//3 and label.sum()<DSIZE/1.5: continue
+            else: break
+        if ind == NUM_TASKS - 1: break
     return W_star, labels
 
 
@@ -192,7 +196,7 @@ def train(W_star, dataloaders, device):
         distance = 0
         init_time = time.process_time()        
         for task_ind in range(NUM_TASKS):
-                           
+            if task_ind!=NUM_TASKS-1: distance+=abs(permutation[task_ind+1]*INC-permutation[task_ind]*INC)           
             model.fit(dataset[task_ind], lr)            
             c = model.coef_.flatten() 
             losses[s][task_ind] = torch.Tensor((g:=get_accuracies(model, dataloaders[0]))[1])
@@ -212,10 +216,15 @@ def train(W_star, dataloaders, device):
         print(f"Time taken:\t\t {time.process_time()-init_time}\n\n")
         results[s] = torch.Tensor([dx, dn, a, permutation[-1]])
     return results, losses, w_distances, coefs
-
+def retrain_wstar(features, labels, device):
+    all_data  = LRDataset(torch.cat(features, dim  = 0), torch.cat(labels, dim = 0))
+    all_data = DataLoader(all_data, shuffle = True, batch_size= 50)
+    model_star = Regression(DIM, FUNC)
+    model_star.fit(all_data, lr)
+    return model_star.coef_.to(device).flatten()
 def main():    
     """ Main function for linear continual learning experiments. """
-
+    SEED = int(args[0])
     device = torch.device(f"cuda:{GPU}" if torch.cuda.is_available() else "cpu")
     torch.manual_seed(SEED)
     random.seed(SEED)
@@ -224,6 +233,8 @@ def main():
     # Set up training data.
     features, span_ws = generate_data()
     W_star, labels = generate_solution_labels(features, span_ws)
+    if RETRAIN:        
+        W_star = retrain_wstar(features, labels, device)
     
     dataloaders = [
         DataLoader(
