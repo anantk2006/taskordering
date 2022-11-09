@@ -21,9 +21,9 @@ samps = 0
 
 GPU = 3
 FUNC = "log"
-datagen = "good" # Choices: ["general", "good"]
+DATAGEN = "good" # Choices: ["general", "good"]
 
-lr = 0.5 if FUNC == "lin" else 0.1 if datagen=="general" else 0.5
+lr = 0.5 if FUNC == "lin" else 0.1 if DATAGEN == "general" else 0.5
 BATCH_SIZE = 50
 RETRAIN = True
 
@@ -35,7 +35,8 @@ DATA_ENTRY_MAX = 3 #max value of each data entry
 ang_bet  = lambda a, b: torch.dot(a,b)/(torch.linalg.norm(b)*torch.linalg.norm(a)) #angle similarity metrics 
 proj = lambda a, b: (torch.dot(a, b)/torch.dot(b, b))*b
 
-def generate_data():
+
+def generate_data(datagen = "good"):
     """ Generate training features. """
     def get_matrix(N):
         while True : #sometimes scipy bugs out, so we need a while loops
@@ -170,7 +171,8 @@ def train(W_star, dataloaders, device):
     def get_accuracies(model, datasets):
         ret_a = []; ret_l = []
         for dataset in datasets:
-            ret_a.append((t:=model.test(dataset))[0])
+            t = model.test(dataset)
+            ret_a.append(t[0])
             ret_l.append(t[1])
         return [float(r) for r in ret_a], ret_l #return test accuracies and losses for the model
 
@@ -199,7 +201,8 @@ def train(W_star, dataloaders, device):
             if task_ind!=NUM_TASKS-1: distance+=abs(permutation[task_ind+1]*INC-permutation[task_ind]*INC)           
             model.fit(dataset[task_ind], lr)            
             c = model.coef_.flatten() 
-            losses[s][task_ind] = torch.Tensor((g:=get_accuracies(model, dataloaders[0]))[1])
+            g = get_accuracies(model, dataloaders[0])
+            losses[s][task_ind] = torch.Tensor(g[1])
 
         losses[s][-1] = torch.Tensor(permutation)      
         
@@ -209,19 +212,23 @@ def train(W_star, dataloaders, device):
         a=float(sum(acc)/NUM_TASKS)
         dn=float(distance)
         print(f"Permutation:\t\t {permutation}")
-        print(f"Difference from X*:\t {(dx:=float(get_distances(model.coef_.squeeze(0), W_star)))}")
-        print(f"Distance traveled:\t {(dn:=float(distance))}")        
-        print(f"Accuracies:\t\t {(acc)}")
-        print(f"Avg. accuracy:\t\t {(a:=float(sum(acc)/NUM_TASKS))}")
+        print(f"Difference from X*:\t {dx}")
+        print(f"Distance traveled:\t {dn}")
+        print(f"Accuracies:\t\t {acc}")
+        print(f"Avg. accuracy:\t\t {a}")
         print(f"Time taken:\t\t {time.process_time()-init_time}\n\n")
         results[s] = torch.Tensor([dx, dn, a, permutation[-1]])
     return results, losses, w_distances, coefs
+
+
 def retrain_wstar(features, labels, device):
     all_data  = LRDataset(torch.cat(features, dim  = 0), torch.cat(labels, dim = 0))
     all_data = DataLoader(all_data, shuffle = True, batch_size= 50)
     model_star = Regression(DIM, FUNC)
     model_star.fit(all_data, lr)
     return model_star.coef_.to(device).flatten()
+
+
 def main():    
     """ Main function for linear continual learning experiments. """
     SEED = int(args[0])
@@ -231,7 +238,7 @@ def main():
     numpy.random.seed(SEED)
 
     # Set up training data.
-    features, span_ws = generate_data()
+    features, span_ws = generate_data(DATAGEN)
     W_star, labels = generate_solution_labels(features, span_ws)
     if RETRAIN:        
         W_star = retrain_wstar(features, labels, device)

@@ -23,8 +23,7 @@ class Regression(nn.Module):
         self.optim = torch.optim.SGD(self.net.parameters(), lr = lr)
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optim, lambda epoch: lr/sqrt(epoch+1))
       
-        
-        while ((p:=self.test(dataset)[1])>0.01) if self.function == "lin" else (self.test(dataset)[0]<1):
+        while (self.test(dataset)[1]>0.01) if self.function == "lin" else (self.test(dataset)[0]<1):
             
             for features, labels in dataset:   
                 self.optim.zero_grad()
