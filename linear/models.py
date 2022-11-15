@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 from math import sqrt
+import time
 class Regression(nn.Module):
     def __init__(self, DIM, FUNC):
         #declare model, loss function, optimizer, initialize weights
@@ -22,9 +23,11 @@ class Regression(nn.Module):
         
         self.optim = torch.optim.SGD(self.net.parameters(), lr = lr)
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optim, lambda epoch: lr/sqrt(epoch+1))
+        t = time.time()
       
-        while (self.test(dataset)[1]>0.01) if self.function == "lin" else (self.test(dataset)[0]<1):
+        while (self.test(dataset)[1]>0.01) if self.function == "lin" else ((p:=self.test(dataset))[0]<1 or p[1]>0.005):
             
+            if time.time()-t> 8: break
             for features, labels in dataset:   
                 self.optim.zero_grad()
                 preds = self(features).unsqueeze(-1) #predict using model

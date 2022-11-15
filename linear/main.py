@@ -21,16 +21,17 @@ samps = 0
 
 GPU = 3
 FUNC = "log"
-DATAGEN = "good" # Choices: ["general", "good"]
+DATAGEN = "general" # Choices: ["general", "good"]
 
-lr = 0.5 if FUNC == "lin" else 0.1 if DATAGEN == "general" else 0.5
+lr = 0.5 if FUNC == "lin" else 0.25 if DATAGEN == "general" else 0.5
 BATCH_SIZE = 50
 RETRAIN = True
 
 
-ERROR = 0.1 #max ERROR that data row can stray from 0 to minimize last element
+ERROR = 0.07 #max ERROR that data row can stray from 0 to minimize last element
 BALANCE = 0.3 # counter balance exponent to balance out X from numerical stray resulting from triangularity
 DATA_ENTRY_MAX = 3 #max value of each data entry
+LAST_ENTRY_MAX = 6
 
 ang_bet  = lambda a, b: torch.dot(a,b)/(torch.linalg.norm(b)*torch.linalg.norm(a)) #angle similarity metrics 
 proj = lambda a, b: (torch.dot(a, b)/torch.dot(b, b))*b
@@ -74,21 +75,21 @@ def generate_data(datagen = "good"):
     i = 0
     
     for ind, w in enumerate(span_ws):
+      while True:
         X = torch.zeros((DSIZE, DIM))
         e_sum = 0
         for i in range(DSIZE):
             
             if datagen == "general":
-                nums = list(range(i+1, DIM))
-                X[i][i] = 1
+                nums = list(range(0, DIM))
             elif datagen == "good":
                 nums = set(range(i+1, DIM)) #which numbers to fill in
-                X[i][i] = random.random()+1
+                X[i][i] = 1+random.random()
 
             else:
                 raise NotImplementedError
 
-            while len(nums)>1:
+            while len(nums) if datagen=="general" else len(nums)-1:
 
                 if datagen == "general":
                     n = random.choice(nums) # changes every time
@@ -114,11 +115,11 @@ def generate_data(datagen = "good"):
                 X[i][n] = random.random()*(errors[0]-errors[1])+errors[1]
 
             if datagen == "general":
-                nums = [nums.pop()]+list(set(range(DIM)))  
+                nums = list(set(range(0, DIM)))
                 while True:  #finding optimal location to place last number to prevent overflow
                     n = nums.pop()
                     last = -(torch.dot(X[i], w)-X[i][n]*w[n])/w[n]
-                    if abs(last)<DATA_ENTRY_MAX: 
+                    if abs(last)<(DATA_ENTRY_MAX if len(nums)>100 else LAST_ENTRY_MAX): 
                         X[i][n] = last
                         break
             elif datagen == "good":
@@ -127,19 +128,14 @@ def generate_data(datagen = "good"):
             else:
                 raise NotImplementedError
 
-        if datagen == "general":
-            O = get_matrix(DSIZE)
-            for i in range(DSIZE):
-                O[:, i] = (O[:, i]/torch.linalg.norm(O[:, i]))*((DIM-i)**BALANCE) # balance out columns of matrix
-            X = O@X
-        elif datagen == "good":
-            X = get_matrix(DSIZE)@X                  
-        else:
-            raise NotImplementedError
-
-        features.append(X)
-        print(X)
-        print(f"Task Data {ind} created")
+       
+        X = get_matrix(DSIZE)@X                  
+        
+        if datagen=="good" or numpy.linalg.matrix_rank(X)==DSIZE:
+            features.append(X)
+            print(X)
+            print(f"Task Data {ind} created")
+            break
     return features, span_ws
 
 
@@ -165,7 +161,7 @@ def generate_solution_labels(features, span_ws):
     return W_star, labels
 
 
-def train(W_star, dataloaders, device):
+def train(W_star, dataloaders, device, span_ws):
     """ Run continual learning with a linear model. """  
 
     def get_accuracies(model, datasets):
@@ -218,7 +214,7 @@ def train(W_star, dataloaders, device):
         print(f"Avg. accuracy:\t\t {a}")
         print(f"Time taken:\t\t {time.process_time()-init_time}\n\n")
         results[s] = torch.Tensor([dx, dn, a, permutation[-1]])
-    return results, losses, w_distances, coefs
+    return results, losses, w_distances, coefs, span_ws
 
 
 def retrain_wstar(features, labels, device):
@@ -251,7 +247,7 @@ def main():
     ]
 
     # Perform training and save results.
-    results = train(W_star, dataloaders, device)
+    results = train(W_star, dataloaders, device, span_ws)
     torch.save(results, f"../lgrgresults/results{SEED}.pt")
     
 

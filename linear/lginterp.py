@@ -2,11 +2,12 @@ import torch
 import matplotlib.pyplot as plt
 import itertools
 from math import factorial
-data = torch.load("../lgrgresults/lgresgood.pt")
-losses = torch.load("../lgrgresults/lglossesgood.pt")
+res = torch.load("../lgrgresults/lgresranked.pt")
 
-data = torch.stack(data, dim = 0)
-losses = torch.stack(losses, dim = 0)
+
+data = torch.stack([d[0] for d in res], dim = 0)
+losses = torch.stack([d[1] for d in res], dim = 0)
+print(data.shape, losses.shape)
 if len(data[0])==factorial(len(losses[0][0][-1])):
 #print(data.shape, losses.shape)
 
@@ -51,7 +52,8 @@ if len(data[0])==factorial(len(losses[0][0][-1])):
     for s in z:
         print(s)
 else:
-    span_ws = torch.stack(torch.load("../lgrgresults/lgws40_8"))
+    span_ws = [d[4] for d in res]
+    
 
     ang_bet  = lambda a, b: torch.dot(a,b)/torch.linalg.norm(a)/torch.linalg.norm(b)
     distances = []

@@ -1,5 +1,6 @@
 import torch
 import numpy
+import scipy
 
 import main
 
@@ -24,10 +25,13 @@ def test_nullspaces_and_rank_general():
     passed = True
     for ind, feat in enumerate(features):
         m = torch.max(torch.abs(feat@span_ws[ind]))
+        print(feat@span_ws[ind])
         if m>0.01:
             print(feat@span_ws[ind])
             passed = False
+        print(torch.abs(feat).max(), torch.abs(feat).mean())
         print(numpy.linalg.matrix_rank(feat))
+        
 
     return passed, span_ws, features
 
@@ -45,6 +49,7 @@ def test_labels(features, span_ws):
 
 
 if __name__ == "__main__":
+    
     test1, span_ws, features = test_nullspaces_and_rank_good()
     test2, span_ws, features = test_nullspaces_and_rank_general()
     test3, labels, W_star = test_labels(features, span_ws)

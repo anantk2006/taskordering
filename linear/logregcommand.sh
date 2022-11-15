@@ -1,5 +1,5 @@
-for i in {0..9}
+for i in {0..39}
 do
-    python3 logreg.py $i
+    python3 main.py $i
     wait -n $!
 done
