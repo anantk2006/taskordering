@@ -13,11 +13,11 @@ from models import Regression
 from dataset import LRDataset
 
 
-NUM_TASKS = 5
+NUM_TASKS = 9
 INC = 1/18* pi
 DSIZE = 500
 DIM = 501
-samps = 0
+samps = 250
 
 GPU = 3
 FUNC = "log"
@@ -129,7 +129,7 @@ def generate_data(datagen = "good"):
                 raise NotImplementedError
 
        
-        X = get_matrix(DSIZE)@X                  
+     
         
         if datagen=="good" or numpy.linalg.matrix_rank(X)==DSIZE:
             features.append(X)
@@ -161,7 +161,7 @@ def generate_solution_labels(features, span_ws):
     return W_star, labels
 
 
-def train(W_star, dataloaders, device, span_ws):
+def train(W_star, dataloaders, device, span_ws, features):
     """ Run continual learning with a linear model. """  
 
     def get_accuracies(model, datasets):
@@ -182,7 +182,7 @@ def train(W_star, dataloaders, device, span_ws):
 
     results = torch.zeros(samps if samps!=0 else factorial(NUM_TASKS), 4)
     w_distances = torch.zeros(samps if samps!=0 else factorial(NUM_TASKS), NUM_TASKS)
-    coefs = torch.zeros(factorial(NUM_TASKS), DIM)
+    coefs = torch.zeros(samps if samps!=0 else factorial(NUM_TASKS), DIM)
     losses = torch.zeros(samps if samps!=0 else factorial(NUM_TASKS), NUM_TASKS+1, NUM_TASKS) 
 
     W_star = W_star.to(device)
@@ -194,9 +194,13 @@ def train(W_star, dataloaders, device, span_ws):
         distance = 0
         init_time = time.process_time()        
         for task_ind in range(NUM_TASKS):
-            if task_ind!=NUM_TASKS-1: distance+=abs(permutation[task_ind+1]*INC-permutation[task_ind]*INC)           
+            if task_ind!=NUM_TASKS-1: 
+                distance+=abs(permutation[task_ind+1]*INC-permutation[task_ind]*INC)   
+                
             model.fit(dataset[task_ind], lr)            
             c = model.coef_.flatten() 
+            
+            
             g = get_accuracies(model, dataloaders[0])
             losses[s][task_ind] = torch.Tensor(g[1])
 
@@ -247,7 +251,7 @@ def main():
     ]
 
     # Perform training and save results.
-    results = train(W_star, dataloaders, device, span_ws)
+    results = train(W_star, dataloaders, device, span_ws, features)
     torch.save(results, f"../lgrgresults/results{SEED}.pt")
     
 

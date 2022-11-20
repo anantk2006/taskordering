@@ -2,7 +2,7 @@ import torch
 import matplotlib.pyplot as plt
 import itertools
 from math import factorial
-res = torch.load("../lgrgresults/lgresranked.pt")
+res = torch.load("../lgrgresults/lgresrankedloss.pt")
 
 
 data = torch.stack([d[0] for d in res], dim = 0)
