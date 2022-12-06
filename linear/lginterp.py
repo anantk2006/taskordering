@@ -2,11 +2,11 @@ import torch
 import matplotlib.pyplot as plt
 import itertools
 from math import factorial
-res = torch.load("../lgrgresults/lgresrankedloss.pt")
+res = torch.load("../lgrgresults/lgresrankedloss4.pt")
 
 
-data = torch.stack([d[0] for d in res], dim = 0)
-losses = torch.stack([d[1] for d in res], dim = 0)
+data = torch.stack([d[0] for d in res[0:15]], dim = 0)
+losses = torch.stack([d[1] for d in res[0:15]], dim = 0)
 print(data.shape, losses.shape)
 if len(data[0])==factorial(len(losses[0][0][-1])):
 #print(data.shape, losses.shape)

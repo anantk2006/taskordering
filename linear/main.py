@@ -13,17 +13,17 @@ from models import Regression
 from dataset import LRDataset
 
 
-NUM_TASKS = 9
+NUM_TASKS = 5
 INC = 1/18* pi
 DSIZE = 500
 DIM = 501
-samps = 250
+samps = 0
 
 GPU = 3
 FUNC = "log"
 DATAGEN = "general" # Choices: ["general", "good"]
 
-lr = 0.5 if FUNC == "lin" else 0.25 if DATAGEN == "general" else 0.5
+lr = 0.5 if FUNC == "lin" else 0.2 if DATAGEN == "general" else 0.5
 BATCH_SIZE = 50
 RETRAIN = True
 
@@ -136,6 +136,9 @@ def generate_data(datagen = "good"):
             print(X)
             print(f"Task Data {ind} created")
             break
+    for i in features[0]:
+        for j in features[0]:
+            print(ang_bet(i, j))
     return features, span_ws
 
 
@@ -199,7 +202,7 @@ def train(W_star, dataloaders, device, span_ws, features):
                 
             model.fit(dataset[task_ind], lr)            
             c = model.coef_.flatten() 
-            
+            print(ang_bet(c, W_star), ang_bet(c - proj(c, W_star), span_ws[task_ind]))
             
             g = get_accuracies(model, dataloaders[0])
             losses[s][task_ind] = torch.Tensor(g[1])

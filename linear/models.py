@@ -25,7 +25,7 @@ class Regression(nn.Module):
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optim, lambda epoch: lr/sqrt(epoch+1))
         t = time.time()
       
-        while (self.test(dataset)[1]>0.01) if self.function == "lin" else ((p:=self.test(dataset))[0]<1 or p[1]>0.003):
+        while (self.test(dataset)[1]>0.01) if self.function == "lin" else ((p:=self.test(dataset))[0]<1 or p[1]>0.002):
             
             if time.time()-t> 8: break
             for features, labels in dataset:   
